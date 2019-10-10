@@ -88,6 +88,10 @@ impl Parser {
         match token {
             Token::Identifier(_) => self.parse_identifier(),
             Token::Number(_) => self.parse_integer_literal_expression(),
+            Token::Keyword(k) => match k {
+                Keyword::True | Keyword::False => self.parse_boolean_expression(),
+                t => Err(ParseError::NoPrefix(Token::Keyword(t.clone()))),
+            },
             Token::Minus | Token::Bang => self.parse_prefix_expression(),
             t => Err(ParseError::NoPrefix(t.clone())),
         }
@@ -128,6 +132,16 @@ impl Parser {
         let right = Box::new(right);
 
         Ok(Expression::Prefix(PrefixExpression { operator, right }))
+    }
+
+    fn parse_boolean_expression(&self) -> Result<Expression> {
+        let result = match self.current_token() {
+            Token::Keyword(Keyword::True) => BooleanLiteral { value: true },
+            Token::Keyword(Keyword::False) => BooleanLiteral { value: false },
+            _ => unreachable!(),
+        };
+
+        Ok(Expression::BooleanLiteral(result))
     }
 
     fn parse_identifier(&self) -> Result<Expression> {
@@ -232,6 +246,18 @@ mod test {
         parser.parse().unwrap()
     }
 
+    // fn assert_value<T: std::fmt::Debug>(program: Program, expect: T) {
+    //     let statement = program
+    //         .statements
+    //         .first()
+    //         .expect("program has no statements");
+    //     match statement {
+    //         Statement::Expression(e) => assert_eq!(e, expect),
+    //         Statement::Let(e) => assert_eq!(e, expect),
+    //         Statement::Return(e) => assert_eq!(e, expect),
+    //     }
+    // }
+
     #[test]
     fn parse_identifier() {
         let parser = Parser::new(vec![Token::Identifier("someVar".into()), Token::Semicolon]);
@@ -276,7 +302,10 @@ mod test {
     fn parse_infix_expression_star() {
         let input = "5 * 5;";
         let program = parse(input);
-        let actual = &program.statements[0];
+        let actual = program
+            .statements
+            .first()
+            .expect("no statements in program");
         let expect = Statement::Expression(ExpressionStatement {
             value: Expression::Infix(InfixExpression {
                 left: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
@@ -326,6 +355,23 @@ mod test {
         assert_eq!(expect, actual);
     }
 
+    #[test]
+    fn parse_boolean_literal() {
+        let test_cases = vec![("true;", true), ("false;", false)];
+        for test_case in test_cases {
+            let program = parse(test_case.0);
+            let actual = program
+                .statements
+                .first()
+                .expect("program has no statements");
+            let expect = Statement::Expression(ExpressionStatement {
+                value: Expression::BooleanLiteral(BooleanLiteral { value: test_case.1 }),
+            });
+            assert_eq!(&expect, actual);
+        }
+    }
+
+    #[test]
     #[test]
     fn test_identifier_expressions() {
         let program = parse("foobar;");

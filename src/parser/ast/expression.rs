@@ -6,6 +6,7 @@ use std::convert::TryFrom;
 pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
+    BooleanLiteral(BooleanLiteral),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
 }
@@ -31,4 +32,9 @@ pub struct InfixExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) operator: Operator,
     pub(crate) right: Box<Expression>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BooleanLiteral {
+    pub(crate) value: bool,
 }

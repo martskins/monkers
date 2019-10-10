@@ -22,23 +22,7 @@ impl From<&Token> for Precedence {
             Token::Minus => Precedence::Sum,
             Token::Slash => Precedence::Product,
             Token::Asterisk => Precedence::Product,
-            t => panic!("invalid token {:?}", t),
-        }
-    }
-}
-
-impl From<Token> for Precedence {
-    fn from(f: Token) -> Self {
-        match f {
-            Token::EqEq => Precedence::Equals,
-            Token::NotEq => Precedence::Equals,
-            Token::LT => Precedence::LessGreater,
-            Token::GT => Precedence::LessGreater,
-            Token::Plus => Precedence::Sum,
-            Token::Minus => Precedence::Sum,
-            Token::Slash => Precedence::Product,
-            Token::Asterisk => Precedence::Product,
-            t => panic!("invalid token {:?}", t),
+            _ => Precedence::Lowest,
         }
     }
 }
