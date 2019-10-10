@@ -5,6 +5,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Block(BlockStatement),
 }
 
 #[derive(Debug, PartialEq)]
@@ -21,4 +22,9 @@ pub struct ReturnStatement {
 #[derive(Debug, PartialEq)]
 pub struct ExpressionStatement {
     pub(crate) value: Expression,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BlockStatement {
+    pub(crate) statements: Vec<Statement>,
 }

@@ -91,6 +91,7 @@ impl Parser {
             Token::LParen => self.parse_grouped_expression(),
             Token::Keyword(k) => match k {
                 Keyword::True | Keyword::False => self.parse_boolean_expression(),
+                Keyword::If => self.parse_if_expression(),
                 t => Err(ParseError::NoPrefix(Token::Keyword(t.clone()))),
             },
             Token::Minus | Token::Bang => self.parse_prefix_expression(),
@@ -110,6 +111,45 @@ impl Parser {
             | Token::GT => self.parse_infix_expression(left),
             t => Err(ParseError::NoInfix(t.clone())),
         }
+    }
+
+    fn parse_if_expression(&mut self) -> Result<Expression> {
+        expect!(self, Token::LParen);
+        self.next();
+        let condition = self.parse_expression(Precedence::Lowest)?;
+        expect!(self, Token::RParen);
+        expect!(self, Token::LBrace);
+        let consequence = self.parse_block_statement()?;
+        expect!(self, Token::RBrace);
+        let alternative = if self.current_token() == &Token::Keyword(Keyword::Else) {
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
+        let expr = IfExpression {
+            condition: Box::new(condition),
+            consequence,
+            alternative,
+        };
+
+        Ok(Expression::If(expr))
+    }
+
+    fn parse_block_statement(&mut self) -> Result<BlockStatement> {
+        self.next(); // skip LBrace
+
+        let mut statements = vec![];
+        while self.current_token() != &Token::RBrace && self.current_token() != &Token::EOF {
+            let stmt = self.parse_statement();
+            if let Ok(stmt) = stmt {
+                statements.push(stmt);
+            }
+
+            self.next();
+        }
+
+        Ok(BlockStatement { statements })
     }
 
     fn parse_grouped_expression(&mut self) -> Result<Expression> {
@@ -189,7 +229,9 @@ impl Parser {
 
     fn parse_expression_statement(&mut self) -> Result<ExpressionStatement> {
         let expr = self.parse_expression(Precedence::Lowest)?;
-        expect!(self, Token::Semicolon);
+        if self.peek_token() == &Token::Semicolon {
+            self.next();
+        }
 
         Ok(ExpressionStatement { value: expr })
     }
@@ -248,27 +290,61 @@ mod test {
     use crate::parser::*;
 
     fn parse(input: &str) -> Program {
-        let mut parser = new_parser(input);
+        let mut lexer = Lexer::new(input.into());
+        let tokens = lexer.lex();
+        let mut parser = Parser::new(tokens);
         parser.parse().unwrap()
     }
 
-    fn new_parser(input: &str) -> Parser {
-        let mut lexer = Lexer::new(input.into());
-        let tokens = lexer.lex();
-        Parser::new(tokens)
+    #[test]
+    fn parse_if_else_expression() {
+        let program = parse("if (x < y) { x } else { y };");
+        let actual = program.statements.first().unwrap();
+        let expect = Statement::Expression(ExpressionStatement {
+            value: Expression::If(IfExpression {
+                condition: Box::new(Expression::Infix(InfixExpression {
+                    left: Box::new(Expression::Identifier(Identifier { value: "x".into() })),
+                    operator: Operator::Lt,
+                    right: Box::new(Expression::Identifier(Identifier { value: "y".into() })),
+                })),
+                consequence: BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        value: Expression::Identifier(Identifier { value: "x".into() }),
+                    })],
+                },
+                alternative: Some(BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        value: Expression::Identifier(Identifier { value: "y".into() }),
+                    })],
+                }),
+            }),
+        });
+
+        assert_eq!(&expect, actual);
     }
 
-    // fn assert_value<T: std::fmt::Debug>(program: Program, expect: T) {
-    //     let statement = program
-    //         .statements
-    //         .first()
-    //         .expect("program has no statements");
-    //     match statement {
-    //         Statement::Expression(e) => assert_eq!(e, expect),
-    //         Statement::Let(e) => assert_eq!(e, expect),
-    //         Statement::Return(e) => assert_eq!(e, expect),
-    //     }
-    // }
+    #[test]
+    fn parse_if_expression() {
+        let program = parse("if (x < y) { x };");
+        let actual = program.statements.first().unwrap();
+        let expect = Statement::Expression(ExpressionStatement {
+            value: Expression::If(IfExpression {
+                condition: Box::new(Expression::Infix(InfixExpression {
+                    left: Box::new(Expression::Identifier(Identifier { value: "x".into() })),
+                    operator: Operator::Lt,
+                    right: Box::new(Expression::Identifier(Identifier { value: "y".into() })),
+                })),
+                consequence: BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        value: Expression::Identifier(Identifier { value: "x".into() }),
+                    })],
+                },
+                alternative: None,
+            }),
+        });
+
+        assert_eq!(&expect, actual);
+    }
 
     #[test]
     fn parse_grouped_expression() {

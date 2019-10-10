@@ -1,4 +1,5 @@
 use super::operator::Operator;
+use super::statement::BlockStatement;
 use crate::lexer::Token;
 use std::convert::TryFrom;
 
@@ -7,6 +8,7 @@ pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     BooleanLiteral(BooleanLiteral),
+    If(IfExpression),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
 }
@@ -37,4 +39,11 @@ pub struct InfixExpression {
 #[derive(Debug, PartialEq)]
 pub struct BooleanLiteral {
     pub(crate) value: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfExpression {
+    pub(crate) condition: Box<Expression>,
+    pub(crate) consequence: BlockStatement,
+    pub(crate) alternative: Option<BlockStatement>,
 }
