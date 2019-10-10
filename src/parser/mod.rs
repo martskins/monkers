@@ -88,6 +88,7 @@ impl Parser {
         match token {
             Token::Identifier(_) => self.parse_identifier(),
             Token::Number(_) => self.parse_integer_literal_expression(),
+            Token::LParen => self.parse_grouped_expression(),
             Token::Keyword(k) => match k {
                 Keyword::True | Keyword::False => self.parse_boolean_expression(),
                 t => Err(ParseError::NoPrefix(Token::Keyword(t.clone()))),
@@ -109,6 +110,13 @@ impl Parser {
             | Token::GT => self.parse_infix_expression(left),
             t => Err(ParseError::NoInfix(t.clone())),
         }
+    }
+
+    fn parse_grouped_expression(&mut self) -> Result<Expression> {
+        self.next(); // skip paren
+        let expr = self.parse_expression(Precedence::Lowest);
+        expect!(self, Token::RParen);
+        expr
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression> {
@@ -240,10 +248,14 @@ mod test {
     use crate::parser::*;
 
     fn parse(input: &str) -> Program {
+        let mut parser = new_parser(input);
+        parser.parse().unwrap()
+    }
+
+    fn new_parser(input: &str) -> Parser {
         let mut lexer = Lexer::new(input.into());
         let tokens = lexer.lex();
-        let mut parser = Parser::new(tokens);
-        parser.parse().unwrap()
+        Parser::new(tokens)
     }
 
     // fn assert_value<T: std::fmt::Debug>(program: Program, expect: T) {
@@ -257,6 +269,24 @@ mod test {
     //         Statement::Return(e) => assert_eq!(e, expect),
     //     }
     // }
+
+    #[test]
+    fn parse_grouped_expression() {
+        let program = parse("-(5 + 5);");
+        let actual = program.statements.first().unwrap();
+        let expect = Statement::Expression(ExpressionStatement {
+            value: Expression::Prefix(PrefixExpression {
+                operator: Operator::Minus,
+                right: Box::new(Expression::Infix(InfixExpression {
+                    left: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
+                    operator: Operator::Add,
+                    right: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
+                })),
+            }),
+        });
+
+        assert_eq!(&expect, actual);
+    }
 
     #[test]
     fn parse_identifier() {
