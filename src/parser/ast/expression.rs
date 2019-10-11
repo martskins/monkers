@@ -1,7 +1,5 @@
 use super::operator::Operator;
 use super::statement::BlockStatement;
-use crate::lexer::Token;
-use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
@@ -12,6 +10,7 @@ pub enum Expression {
     Prefix(PrefixExpression),
     Infix(InfixExpression),
     Function(FunctionLiteral),
+    Call(CallExpression),
 }
 
 #[derive(Debug, PartialEq)]
@@ -94,5 +93,17 @@ pub struct FunctionLiteral {
 impl From<FunctionLiteral> for Expression {
     fn from(f: FunctionLiteral) -> Self {
         Expression::Function(f)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CallExpression {
+    pub(crate) function: Box<Expression>,
+    pub(crate) arguments: Vec<Expression>,
+}
+
+impl From<CallExpression> for Expression {
+    fn from(f: CallExpression) -> Self {
+        Expression::Call(f)
     }
 }

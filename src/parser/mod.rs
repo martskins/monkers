@@ -83,6 +83,7 @@ impl Parser {
 
     fn infix_parse_fn(&mut self, token: Token, left: Expression) -> Result<Expression> {
         match token {
+            Token::LParen => self.parse_call_expression(left),
             Token::Plus
             | Token::Minus
             | Token::Slash
@@ -93,6 +94,40 @@ impl Parser {
             | Token::GT => self.parse_infix_expression(left),
             t => Err(ParseError::NoInfix(t.clone())),
         }
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>> {
+        self.next(); // skip LParen
+
+        let mut arguments = vec![];
+        while self.current_token() != &Token::RParen && self.current_token() != &Token::EOF {
+            if self.current_token() == &Token::Comma {
+                self.next();
+                continue;
+            }
+
+            let ident = self.parse_expression(Precedence::Lowest);
+            if let Ok(ident) = ident {
+                arguments.push(ident);
+            }
+
+            if self.peek_token() == &Token::RParen || self.peek_token() == &Token::EOF {
+                break;
+            }
+
+            self.next();
+        }
+
+        Ok(arguments)
+    }
+
+    fn parse_call_expression(&mut self, function: Expression) -> Result<Expression> {
+        let arguments = self.parse_call_arguments()?;
+
+        Ok(Expression::from(CallExpression {
+            function: Box::new(function),
+            arguments,
+        }))
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression> {
@@ -339,6 +374,34 @@ mod test {
     }
 
     #[test]
+    fn parse_call_expression() {
+        let program = parse("add(1, 2 * 3, 4 + 5");
+        let actual = program.statements.first().unwrap();
+        let expect = Statement::from(ExpressionStatement {
+            value: Expression::from(CallExpression {
+                function: Box::new(Expression::from(Identifier {
+                    value: "add".into(),
+                })),
+                arguments: vec![
+                    Expression::from(IntegerLiteral { value: 1 }),
+                    Expression::from(InfixExpression {
+                        operator: Operator::Mul,
+                        left: Box::new(Expression::from(IntegerLiteral { value: 2 })),
+                        right: Box::new(Expression::from(IntegerLiteral { value: 3 })),
+                    }),
+                    Expression::from(InfixExpression {
+                        operator: Operator::Add,
+                        left: Box::new(Expression::from(IntegerLiteral { value: 4 })),
+                        right: Box::new(Expression::from(IntegerLiteral { value: 5 })),
+                    }),
+                ],
+            }),
+        });
+
+        assert_eq!(&expect, actual);
+    }
+
+    #[test]
     fn parse_function_literal() {
         let program = parse("fn (x, y) { x };");
         let actual = program.statements.first().unwrap();
@@ -471,10 +534,7 @@ mod test {
     fn parse_infix_expression_star() {
         let input = "5 * 5;";
         let program = parse(input);
-        let actual = program
-            .statements
-            .first()
-            .expect("no statements in program");
+        let actual = program.statements.first().unwrap();
         let expect = Statement::Expression(ExpressionStatement {
             value: Expression::Infix(InfixExpression {
                 left: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
@@ -529,10 +589,7 @@ mod test {
         let test_cases = vec![("true;", true), ("false;", false)];
         for test_case in test_cases {
             let program = parse(test_case.0);
-            let actual = program
-                .statements
-                .first()
-                .expect("program has no statements");
+            let actual = program.statements.first().unwrap();
             let expect = Statement::Expression(ExpressionStatement {
                 value: Expression::BooleanLiteral(BooleanLiteral { value: test_case.1 }),
             });
