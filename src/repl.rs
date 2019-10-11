@@ -1,9 +1,9 @@
 use crate::lexer::{Lexer, Token};
-use std::io::{BufRead, Write};
+use std::io::{BufRead, Result, Write};
 
 static PROMPT: &[u8; 2] = &['>' as u8, '>' as u8];
 
-pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<(), std::io::Error> {
+pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
     loop {
         output.write_all(PROMPT)?;
         output.flush()?;

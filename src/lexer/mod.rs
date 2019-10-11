@@ -24,15 +24,15 @@ impl Lexer {
         self.position -= 1;
     }
 
-    fn next(&mut self) {
-        self.position += 1;
-    }
+    // fn next(&mut self) {
+    //     self.position += 1;
+    // }
 
-    fn peek(&self) -> &char {
-        self.chars
-            .get(self.position + 1)
-            .expect("could not read char")
-    }
+    // fn peek(&self) -> &char {
+    //     self.chars
+    //         .get(self.position + 1)
+    //         .expect("could not read char")
+    // }
 
     fn read_number(&mut self) -> Token {
         let mut value = String::new();
@@ -63,7 +63,7 @@ impl Lexer {
             "return" => Token::Keyword(Keyword::Return),
             "true" => Token::Keyword(Keyword::True),
             "false" => Token::Keyword(Keyword::False),
-            v => Token::Identifier(value),
+            _ => Token::Identifier(value),
         }
     }
 
