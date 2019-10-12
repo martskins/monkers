@@ -11,6 +11,7 @@ pub enum Object {
     Null,
     Integer(i64),
     Boolean(bool),
+    ReturnValue(Box<Object>),
 }
 
 impl Object {
@@ -30,6 +31,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::Integer(v) => write!(f, "{}", v),
             Object::Boolean(v) => write!(f, "{}", v),
+            Object::ReturnValue(v) => write!(f, "{}", v),
         }
     }
 }
@@ -40,13 +42,15 @@ pub trait Node {
 
 impl Node for Program {
     fn eval(&self) -> Object {
-        self.statements
-            .iter()
-            .map(|x| x.eval())
-            .collect::<Vec<Object>>()
-            .last()
-            .unwrap()
-            .clone()
+        let mut result = Object::Null;
+        for stmt in self.statements.iter() {
+            result = stmt.eval();
+            if let Object::ReturnValue(o) = result {
+                return *o;
+            }
+        }
+
+        result
     }
 }
 
@@ -54,7 +58,7 @@ impl Node for Statement {
     fn eval(&self) -> Object {
         match self {
             //     Statement::Let(v) => v.eval(),
-            //     Statement::Return(v) => v.eval(),
+            Statement::Return(v) => Object::ReturnValue(Box::new(v.value.eval())),
             Statement::Expression(v) => v.value.eval(),
             Statement::Block(v) => v.eval(),
             v => unimplemented!("eval not implement for {:?}", v),
@@ -64,13 +68,15 @@ impl Node for Statement {
 
 impl Node for BlockStatement {
     fn eval(&self) -> Object {
-        self.statements
-            .iter()
-            .map(|x| x.eval())
-            .collect::<Vec<Object>>()
-            .last()
-            .unwrap_or(&Object::Null)
-            .clone()
+        let mut result = Object::Null;
+        for stmt in self.statements.iter() {
+            result = stmt.eval();
+            if let Object::ReturnValue(_) = &result {
+                return result.clone();
+            }
+        }
+
+        result
     }
 }
 
@@ -410,6 +416,80 @@ mod test {
         ));
         let actual = node.eval();
         let expected = Object::Null;
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_nested_return_statements() {
+        // if (10 < 12) {
+        //      if (true) {
+        //          return true;
+        //      }
+        //      return false;
+        //  }
+
+        let inner_if_stmt = Statement::Expression(ExpressionStatement {
+            value: Expression::from(IfExpression::new(
+                Expression::BooleanLiteral(BooleanLiteral { value: true }),
+                BlockStatement {
+                    statements: vec![Statement::Return(ReturnStatement {
+                        value: Expression::from(BooleanLiteral { value: true }),
+                    })],
+                },
+                None,
+            )),
+        });
+
+        let outer_if_stmt = Statement::from(ExpressionStatement {
+            value: Expression::from(IfExpression::new(
+                Expression::Infix(InfixExpression::new(
+                    Expression::from(IntegerLiteral { value: 10 }),
+                    Operator::Lt,
+                    Expression::from(IntegerLiteral { value: 12 }),
+                )),
+                BlockStatement {
+                    statements: vec![
+                        inner_if_stmt,
+                        Statement::Return(ReturnStatement {
+                            value: Expression::from(BooleanLiteral { value: false }),
+                        }),
+                    ],
+                },
+                None,
+            )),
+        });
+
+        let actual = outer_if_stmt.eval();
+        let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_return_statement_with_leading_statements() {
+        let node = Statement::from(BlockStatement {
+            statements: vec![
+                Statement::Return(ReturnStatement {
+                    value: Expression::BooleanLiteral(BooleanLiteral { value: true }),
+                }),
+                Statement::Return(ReturnStatement {
+                    value: Expression::BooleanLiteral(BooleanLiteral { value: false }),
+                }),
+            ],
+        });
+
+        let actual = node.eval();
+        let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_return_statement() {
+        let node = Statement::from(ReturnStatement {
+            value: Expression::BooleanLiteral(BooleanLiteral { value: false }),
+        });
+
+        let actual = node.eval();
+        let expected = Object::ReturnValue(Box::new(Object::Boolean(false)));
         assert_eq!(expected, actual);
     }
 }
