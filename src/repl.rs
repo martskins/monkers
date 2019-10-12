@@ -1,4 +1,5 @@
 use crate::lexer::{Lexer, Token};
+use crate::parser::{Parser, Program};
 use std::io::{BufRead, Result, Write};
 
 static PROMPT: &[u8; 2] = &['>' as u8, '>' as u8];
@@ -12,13 +13,10 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         input.read_line(&mut line)?;
 
         let mut lexer = Lexer::new(line);
-        loop {
-            let token = lexer.next_token();
-            if let Token::EOF = token {
-                break;
-            }
+        let tokens = lexer.lex();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
 
-            println!("{:?}", token);
-        }
+        println!("{}", program);
     }
 }

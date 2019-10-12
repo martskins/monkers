@@ -1,4 +1,5 @@
 use crate::lexer::Token;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub enum Operator {
@@ -11,6 +12,24 @@ pub enum Operator {
     Eq,
     NotEq,
     Bang,
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let v = match self {
+            Operator::Minus => "-",
+            Operator::Add => "+",
+            Operator::Mul => "*",
+            Operator::Div => "/",
+            Operator::Gt => ">",
+            Operator::Lt => "<",
+            Operator::Eq => "==",
+            Operator::NotEq => "!=",
+            Operator::Bang => "!",
+        };
+
+        write!(f, "{}", v)
+    }
 }
 
 impl From<&Token> for Operator {

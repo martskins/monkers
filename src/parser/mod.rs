@@ -8,10 +8,7 @@ use crate::lexer::{Keyword, Token};
 use precedence::Precedence;
 use result::{ParseError, Result};
 
-type PrefixParseFn = Box<dyn Fn() -> Expression>;
-type InfixParseFn = Box<dyn Fn(Expression) -> Expression>;
-
-struct Parser {
+pub struct Parser {
     tokens: Vec<Token>,
     position: usize,
 }
@@ -26,7 +23,7 @@ macro_rules! expect {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
-        let mut parser = Parser {
+        let parser = Parser {
             tokens,
             position: 0,
         };

@@ -1,5 +1,6 @@
 use super::operator::Operator;
 use super::statement::BlockStatement;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
@@ -13,9 +14,30 @@ pub enum Expression {
     Call(CallExpression),
 }
 
+impl Display for Expression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Expression::Identifier(v) => write!(f, "{}", v),
+            Expression::IntegerLiteral(v) => write!(f, "{}", v),
+            Expression::BooleanLiteral(v) => write!(f, "{}", v),
+            Expression::If(v) => write!(f, "{}", v),
+            Expression::Prefix(v) => write!(f, "{}", v),
+            Expression::Infix(v) => write!(f, "{}", v),
+            Expression::Function(v) => write!(f, "{}", v),
+            Expression::Call(v) => write!(f, "{}", v),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Identifier {
     pub(crate) value: String,
+}
+
+impl Display for Identifier {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl From<Identifier> for Expression {
@@ -29,6 +51,12 @@ pub struct IntegerLiteral {
     pub(crate) value: i64,
 }
 
+impl Display for IntegerLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 impl From<IntegerLiteral> for Expression {
     fn from(f: IntegerLiteral) -> Self {
         Expression::IntegerLiteral(f)
@@ -39,6 +67,12 @@ impl From<IntegerLiteral> for Expression {
 pub struct PrefixExpression {
     pub(crate) operator: Operator,
     pub(crate) right: Box<Expression>,
+}
+
+impl Display for PrefixExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} {}", self.operator, self.right)
+    }
 }
 
 impl From<PrefixExpression> for Expression {
@@ -54,6 +88,12 @@ pub struct InfixExpression {
     pub(crate) right: Box<Expression>,
 }
 
+impl Display for InfixExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{} {} {}", self.left, self.operator, self.right)
+    }
+}
+
 impl From<InfixExpression> for Expression {
     fn from(f: InfixExpression) -> Self {
         Expression::Infix(f)
@@ -63,6 +103,12 @@ impl From<InfixExpression> for Expression {
 #[derive(Debug, PartialEq)]
 pub struct BooleanLiteral {
     pub(crate) value: bool,
+}
+
+impl Display for BooleanLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
 }
 
 impl From<BooleanLiteral> for Expression {
@@ -78,6 +124,17 @@ pub struct IfExpression {
     pub(crate) alternative: Option<BlockStatement>,
 }
 
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "if ({}) {{\n\t{}\n}}", self.condition, self.consequence)?;
+        if let Some(alt) = &self.alternative {
+            write!(f, " else {{\n\t{}\n}}", alt)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl From<IfExpression> for Expression {
     fn from(f: IfExpression) -> Self {
         Expression::If(f)
@@ -90,6 +147,21 @@ pub struct FunctionLiteral {
     pub(crate) body: BlockStatement,
 }
 
+impl Display for FunctionLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "fn ({}) {{\n\t{}\n}}",
+            self.parameters
+                .iter()
+                .map(|x| format!("{}", x))
+                .collect::<Vec<String>>()
+                .join(","),
+            self.body
+        )
+    }
+}
+
 impl From<FunctionLiteral> for Expression {
     fn from(f: FunctionLiteral) -> Self {
         Expression::Function(f)
@@ -100,6 +172,21 @@ impl From<FunctionLiteral> for Expression {
 pub struct CallExpression {
     pub(crate) function: Box<Expression>,
     pub(crate) arguments: Vec<Expression>,
+}
+
+impl Display for CallExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}({})",
+            self.function,
+            self.arguments
+                .iter()
+                .map(|x| format!("{}", x))
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    }
 }
 
 impl From<CallExpression> for Expression {
