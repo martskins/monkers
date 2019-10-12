@@ -11,7 +11,7 @@ pub enum Statement {
 #[derive(Debug, PartialEq)]
 pub struct LetStatement {
     pub(crate) name: Identifier,
-    // pub(crate) value: Expression,
+    pub(crate) value: Expression,
 }
 
 impl From<LetStatement> for Statement {
@@ -22,7 +22,7 @@ impl From<LetStatement> for Statement {
 
 #[derive(Debug, PartialEq)]
 pub struct ReturnStatement {
-    // pub(crate) value: Expression,
+    pub(crate) value: Expression,
 }
 
 impl From<ReturnStatement> for Statement {
