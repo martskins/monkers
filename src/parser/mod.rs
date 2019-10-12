@@ -13,7 +13,7 @@ pub struct Parser {
     position: usize,
 }
 
-macro_rules! expect {
+macro_rules! expect_token {
     ($t:expr, $p:expr) => {{
         if $t != $p {
             return Err(ParseError::UnexpectedToken($t.clone()));
@@ -127,18 +127,18 @@ impl Parser {
     }
 
     fn parse_if_expression(&mut self) -> Result<Expression> {
-        expect!(self.next_token(), &Token::LParen);
+        expect_token!(self.next_token(), &Token::LParen);
         let condition = self.parse_expression(Precedence::Lowest)?;
-        // expect!(self.next_token(), &Token::RParen);
+        // expect_token!(self.next_token(), &Token::RParen);
 
-        expect!(self.next_token(), &Token::LBrace);
+        expect_token!(self.next_token(), &Token::LBrace);
         let consequence = self.parse_block_statement()?;
-        expect!(self.next_token(), &Token::RBrace);
+        expect_token!(self.next_token(), &Token::RBrace);
 
         let alternative = if self.next_token() == &Token::Keyword(Keyword::Else) {
             self.next();
             let stmt = self.parse_block_statement()?;
-            expect!(self.next_token(), &Token::RBrace);
+            expect_token!(self.next_token(), &Token::RBrace);
 
             Some(stmt)
         } else {
@@ -180,13 +180,13 @@ impl Parser {
     }
 
     fn parse_function_literal(&mut self) -> Result<FunctionLiteral> {
-        expect!(self.next_token(), &Token::LParen);
+        expect_token!(self.next_token(), &Token::LParen);
         let parameters = self.parse_function_parameters()?;
-        expect!(self.next_token(), &Token::RParen);
+        expect_token!(self.next_token(), &Token::RParen);
 
-        expect!(self.next_token(), &Token::LBrace);
+        expect_token!(self.next_token(), &Token::LBrace);
         let body = self.parse_block_statement()?;
-        expect!(self.next_token(), &Token::RBrace);
+        expect_token!(self.next_token(), &Token::RBrace);
 
         Ok(FunctionLiteral { body, parameters })
     }
@@ -216,9 +216,13 @@ impl Parser {
 
     fn parse_grouped_expression(&mut self) -> Result<Expression> {
         self.next(); // skip paren
-        let expr = self.parse_expression(Precedence::Lowest);
-        expect!(self.next_token(), &Token::RParen);
-        expr
+
+        let expr = self.parse_expression(Precedence::Lowest)?;
+        expect_token!(self.next_token(), &Token::RParen);
+
+        Ok(Expression::from(GroupedExpression {
+            value: Box::new(expr),
+        }))
     }
 
     fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression> {
@@ -304,7 +308,7 @@ impl Parser {
         self.next(); // skip return token
 
         let value = self.parse_expression(Precedence::Lowest)?;
-        expect!(self.next_token(), &Token::Semicolon);
+        expect_token!(self.next_token(), &Token::Semicolon);
 
         Ok(ReturnStatement { value })
     }
@@ -316,11 +320,12 @@ impl Parser {
                 value: identifier.clone(),
             };
 
-            expect!(self.next_token(), &Token::Eq);
+            expect_token!(self.next_token(), &Token::Eq);
             self.next();
 
             let value = self.parse_expression(Precedence::Lowest)?;
-            expect!(self.next_token(), &Token::Semicolon);
+            expect_token!(self.next_token(), &Token::Semicolon);
+
             Ok(LetStatement { name, value })
         } else {
             Err(ParseError::UnexpectedToken(token.clone()))
@@ -571,20 +576,20 @@ mod test {
 
         assert_eq!(3, program.statements.len());
 
-        match &program.statements[0] {
-            Statement::Return(_) => {}
-            _ => panic!("test failed"),
-        }
+        let expect = Statement::from(ReturnStatement {
+            value: Expression::from(IntegerLiteral { value: 5 }),
+        });
+        assert_eq!(expect, program.statements[0]);
 
-        match &program.statements[1] {
-            Statement::Return(_) => {}
-            _ => panic!("test failed"),
-        }
+        let expect = Statement::from(ReturnStatement {
+            value: Expression::from(IntegerLiteral { value: 10 }),
+        });
+        assert_eq!(expect, program.statements[1]);
 
-        match &program.statements[2] {
-            Statement::Return(_) => {}
-            _ => panic!("test failed"),
-        }
+        let expect = Statement::from(ReturnStatement {
+            value: Expression::from(IntegerLiteral { value: 838383 }),
+        });
+        assert_eq!(expect, program.statements[2]);
     }
 
     #[test]

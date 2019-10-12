@@ -12,6 +12,7 @@ pub enum Expression {
     Infix(InfixExpression),
     Function(FunctionLiteral),
     Call(CallExpression),
+    Grouped(GroupedExpression),
 }
 
 impl Display for Expression {
@@ -25,6 +26,7 @@ impl Display for Expression {
             Expression::Infix(v) => write!(f, "{}", v),
             Expression::Function(v) => write!(f, "{}", v),
             Expression::Call(v) => write!(f, "{}", v),
+            Expression::Grouped(v) => write!(f, "{}", v),
         }
     }
 }
@@ -192,5 +194,22 @@ impl Display for CallExpression {
 impl From<CallExpression> for Expression {
     fn from(f: CallExpression) -> Self {
         Expression::Call(f)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct GroupedExpression {
+    pub(crate) value: Box<Expression>,
+}
+
+impl Display for GroupedExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "({})", self.value)
+    }
+}
+
+impl From<GroupedExpression> for Expression {
+    fn from(f: GroupedExpression) -> Self {
+        Expression::Grouped(f)
     }
 }
