@@ -1,3 +1,4 @@
+mod evaluator;
 mod lexer;
 mod parser;
 mod repl;

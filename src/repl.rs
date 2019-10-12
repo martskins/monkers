@@ -1,3 +1,4 @@
+use crate::evaluator::Node;
 use crate::lexer::{Lexer, Token};
 use crate::parser::{Parser, Program};
 use std::io::{BufRead, Result, Write};
@@ -16,7 +17,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         let tokens = lexer.lex();
         let mut parser = Parser::new(tokens);
         let program = parser.parse().unwrap();
-
-        println!("{}", program);
+        let evaluated = program.eval();
+        println!("{:?}", evaluated);
     }
 }

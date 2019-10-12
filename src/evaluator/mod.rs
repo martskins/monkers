@@ -1,0 +1,287 @@
+use crate::parser::*;
+
+// TODO: Figure out a way to use a static reference to Boolean instead of creating
+// an instance of Object::Boolean every time we eval one.
+// static TRUE: &'static Object = &Object::Boolean(true);
+// static FALSE: &'static Object = &Object::Boolean(true);
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Object {
+    Null,
+    Integer(i64),
+    Boolean(bool),
+}
+
+pub trait Node {
+    fn eval(&self) -> Object;
+}
+
+impl Node for Program {
+    fn eval(&self) -> Object {
+        self.statements
+            .iter()
+            .map(|x| x.eval())
+            .collect::<Vec<Object>>()
+            .last()
+            .unwrap()
+            .clone()
+    }
+}
+
+impl Node for Statement {
+    fn eval(&self) -> Object {
+        match self {
+            //     Statement::Let(v) => v.eval(),
+            //     Statement::Return(v) => v.eval(),
+            Statement::Expression(v) => v.value.eval(),
+            //     Statement::Block(v) => v.eval(),
+            v => unimplemented!("eval not implement for {:?}", v),
+        }
+    }
+}
+
+impl Node for Expression {
+    fn eval(&self) -> Object {
+        match self {
+            Expression::IntegerLiteral(v) => Object::Integer(v.value),
+            Expression::BooleanLiteral(v) => Object::Boolean(v.value),
+            Expression::Grouped(v) => v.value.eval(),
+            Expression::Infix(v) => {
+                let left = v.left.eval();
+                let right = v.right.eval();
+                eval_infix_expression(&v.operator, left, right)
+            }
+            Expression::Prefix(v) => {
+                let right = v.right.eval();
+                eval_prefix_expression(&v.operator, right)
+            }
+            v => unimplemented!("eval not implement for {:?}", v),
+        }
+    }
+}
+
+fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Object {
+    match operator {
+        Operator::Eq => Object::Boolean(left == right),
+        Operator::NotEq => Object::Boolean(left != right),
+        Operator::Gt | Operator::Lt => match right {
+            Object::Integer(r) => match left {
+                Object::Integer(l) => {
+                    let val = if operator == &Operator::Gt {
+                        l > r
+                    } else {
+                        l < r
+                    };
+                    Object::Boolean(val)
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
+        Operator::Div => match right {
+            Object::Integer(r) => match left {
+                Object::Integer(l) => Object::Integer(l / r),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
+        Operator::Mul => match right {
+            Object::Integer(r) => match left {
+                Object::Integer(l) => Object::Integer(l * r),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
+        Operator::Minus => match right {
+            Object::Integer(r) => match left {
+                Object::Integer(l) => Object::Integer(l - r),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
+        Operator::Add => match right {
+            Object::Integer(r) => match left {
+                Object::Integer(l) => Object::Integer(l + r),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
+        _ => unimplemented!(),
+    }
+}
+
+fn eval_prefix_expression(operator: &Operator, right: Object) -> Object {
+    match operator {
+        Operator::Bang => eval_bang_operator(right),
+        Operator::Minus => eval_minus_prefix_operator(right),
+        _ => unimplemented!(),
+    }
+}
+
+fn eval_minus_prefix_operator(right: Object) -> Object {
+    match right {
+        Object::Integer(v) => Object::Integer(-v),
+        _ => unimplemented!(),
+    }
+}
+
+fn eval_bang_operator(right: Object) -> Object {
+    match right {
+        Object::Boolean(v) => Object::Boolean(!v),
+        Object::Null => Object::Boolean(true),
+        _ => Object::Boolean(false),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::evaluator::*;
+    use crate::lexer::*;
+    use crate::parser::*;
+
+    #[test]
+    fn test_eval_integer_expression() {
+        let node = Expression::from(IntegerLiteral { value: 5 });
+        let actual = node.eval();
+        let expected = Object::Integer(5);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_boolean_expression() {
+        let node = Expression::from(BooleanLiteral { value: true });
+        let actual = node.eval();
+        let expected = Object::Boolean(true);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_minus_operator_on_number_returns_its_opposite_value() {
+        let node = Expression::from(PrefixExpression::new(
+            Operator::Minus,
+            Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(-42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_bang_operator_on_number_returns_false() {
+        let node = Expression::from(PrefixExpression::new(
+            Operator::Bang,
+            Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(false);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_bang_operator_on_true_returns_false() {
+        let node = Expression::from(PrefixExpression::new(
+            Operator::Bang,
+            Expression::BooleanLiteral(BooleanLiteral { value: true }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(false);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_bang_operator_on_false_returns_true() {
+        let node = Expression::from(PrefixExpression::new(
+            Operator::Bang,
+            Expression::BooleanLiteral(BooleanLiteral { value: false }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(true);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_double_bang_operator_on_boolean_leaves_it_unchanged() {
+        let node = Expression::from(PrefixExpression::new(
+            Operator::Bang,
+            Expression::Prefix(PrefixExpression::new(
+                Operator::Bang,
+                Expression::BooleanLiteral(BooleanLiteral { value: false }),
+            )),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(false);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_greater_than_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
+            Operator::Gt,
+            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(true);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_less_than_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
+            Operator::Lt,
+            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Boolean(false);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_multiplication_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
+            Operator::Mul,
+            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_division_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 84 }),
+            Operator::Div,
+            Expression::IntegerLiteral(IntegerLiteral { value: 2 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_subtraction_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 43 }),
+            Operator::Minus,
+            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_infix_addition_expression() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+            Operator::Add,
+            Expression::IntegerLiteral(IntegerLiteral { value: 41 }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+}

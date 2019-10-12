@@ -417,10 +417,12 @@ mod test {
         let actual = parser.parse_expression(Precedence::Lowest).unwrap();
         let expect = Expression::Prefix(PrefixExpression {
             operator: Operator::Minus,
-            right: Box::new(Expression::Infix(InfixExpression {
-                left: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
-                operator: Operator::Add,
-                right: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
+            right: Box::new(Expression::Grouped(GroupedExpression {
+                value: Box::new(Expression::Infix(InfixExpression {
+                    left: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
+                    operator: Operator::Add,
+                    right: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
+                })),
             })),
         });
 
@@ -500,10 +502,12 @@ mod test {
         let mut parser = parser_from("if (x > y) { x } else { y }");
         let actual = parser.parse_if_expression().unwrap();
         let expect = Expression::If(IfExpression {
-            condition: Box::new(Expression::Infix(InfixExpression {
-                operator: Operator::Gt,
-                left: Box::new(Expression::from(Identifier { value: "x".into() })),
-                right: Box::new(Expression::from(Identifier { value: "y".into() })),
+            condition: Box::new(Expression::Grouped(GroupedExpression {
+                value: Box::new(Expression::Infix(InfixExpression {
+                    operator: Operator::Gt,
+                    left: Box::new(Expression::from(Identifier { value: "x".into() })),
+                    right: Box::new(Expression::from(Identifier { value: "y".into() })),
+                })),
             })),
             consequence: BlockStatement {
                 statements: vec![Statement::from(ExpressionStatement {

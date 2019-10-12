@@ -71,6 +71,15 @@ pub struct PrefixExpression {
     pub(crate) right: Box<Expression>,
 }
 
+impl PrefixExpression {
+    pub fn new(operator: Operator, right: Expression) -> PrefixExpression {
+        PrefixExpression {
+            operator,
+            right: Box::new(right),
+        }
+    }
+}
+
 impl Display for PrefixExpression {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{} {}", self.operator, self.right)
@@ -88,6 +97,16 @@ pub struct InfixExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) operator: Operator,
     pub(crate) right: Box<Expression>,
+}
+
+impl InfixExpression {
+    pub fn new(left: Expression, operator: Operator, right: Expression) -> InfixExpression {
+        InfixExpression {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
+        }
+    }
 }
 
 impl Display for InfixExpression {
