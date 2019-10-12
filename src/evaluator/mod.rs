@@ -1,4 +1,5 @@
 use crate::parser::*;
+use std::fmt::{self, Display, Formatter};
 
 // TODO: Figure out a way to use a static reference to Boolean instead of creating
 // an instance of Object::Boolean every time we eval one.
@@ -10,6 +11,27 @@ pub enum Object {
     Null,
     Integer(i64),
     Boolean(bool),
+}
+
+impl Object {
+    fn is_truthy(&self) -> bool {
+        match self {
+            Object::Null => false,
+            Object::Integer(0) => false,
+            Object::Boolean(false) => false,
+            _ => true,
+        }
+    }
+}
+
+impl Display for Object {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Object::Null => write!(f, "null"),
+            Object::Integer(v) => write!(f, "{}", v),
+            Object::Boolean(v) => write!(f, "{}", v),
+        }
+    }
 }
 
 pub trait Node {
@@ -34,9 +56,21 @@ impl Node for Statement {
             //     Statement::Let(v) => v.eval(),
             //     Statement::Return(v) => v.eval(),
             Statement::Expression(v) => v.value.eval(),
-            //     Statement::Block(v) => v.eval(),
+            Statement::Block(v) => v.eval(),
             v => unimplemented!("eval not implement for {:?}", v),
         }
+    }
+}
+
+impl Node for BlockStatement {
+    fn eval(&self) -> Object {
+        self.statements
+            .iter()
+            .map(|x| x.eval())
+            .collect::<Vec<Object>>()
+            .last()
+            .unwrap_or(&Object::Null)
+            .clone()
     }
 }
 
@@ -45,6 +79,18 @@ impl Node for Expression {
         match self {
             Expression::IntegerLiteral(v) => Object::Integer(v.value),
             Expression::BooleanLiteral(v) => Object::Boolean(v.value),
+            Expression::If(v) => {
+                let condition = v.condition.eval();
+                if condition.is_truthy() {
+                    v.consequence.eval()
+                } else {
+                    if let Some(alt) = &v.alternative {
+                        return alt.eval();
+                    }
+
+                    Object::Null
+                }
+            }
             Expression::Grouped(v) => v.value.eval(),
             Expression::Infix(v) => {
                 let left = v.left.eval();
@@ -127,6 +173,7 @@ fn eval_minus_prefix_operator(right: Object) -> Object {
 
 fn eval_bang_operator(right: Object) -> Object {
     match right {
+        Object::Integer(0) => Object::Boolean(true),
         Object::Boolean(v) => Object::Boolean(!v),
         Object::Null => Object::Boolean(true),
         _ => Object::Boolean(false),
@@ -282,6 +329,87 @@ mod test {
         ));
         let actual = node.eval();
         let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_if_expression_with_else_and_non_trivial_condition() {
+        let node = Expression::from(IfExpression::new(
+            Expression::If(IfExpression::new(
+                Expression::BooleanLiteral(BooleanLiteral { value: false }),
+                BlockStatement {
+                    statements: vec![Statement::Expression(ExpressionStatement {
+                        value: Expression::BooleanLiteral(BooleanLiteral { value: true }),
+                    })],
+                },
+                None,
+            )),
+            BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+                })],
+            },
+            Some(BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+                })],
+            }),
+        ));
+
+        let actual = node.eval();
+        let expected = Object::Integer(1);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_if_expression_with_else() {
+        let node = Expression::from(IfExpression::new(
+            Expression::BooleanLiteral(BooleanLiteral { value: true }),
+            BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+                })],
+            },
+            Some(BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+                })],
+            }),
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_if_expression_without_else() {
+        let node = Expression::from(IfExpression::new(
+            Expression::BooleanLiteral(BooleanLiteral { value: true }),
+            BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+                })],
+            },
+            None,
+        ));
+        let actual = node.eval();
+        let expected = Object::Integer(42);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_eval_if_expression_evaluates_to_null_on_falsy_condition_with_no_else() {
+        let node = Expression::from(IfExpression::new(
+            Expression::BooleanLiteral(BooleanLiteral { value: false }),
+            BlockStatement {
+                statements: vec![Statement::Expression(ExpressionStatement {
+                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
+                })],
+            },
+            None,
+        ));
+        let actual = node.eval();
+        let expected = Object::Null;
         assert_eq!(expected, actual);
     }
 }

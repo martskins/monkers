@@ -129,13 +129,13 @@ impl Parser {
     fn parse_if_expression(&mut self) -> Result<Expression> {
         expect_token!(self.next_token(), &Token::LParen);
         let condition = self.parse_expression(Precedence::Lowest)?;
-        // expect_token!(self.next_token(), &Token::RParen);
 
         expect_token!(self.next_token(), &Token::LBrace);
         let consequence = self.parse_block_statement()?;
         expect_token!(self.next_token(), &Token::RBrace);
 
-        let alternative = if self.next_token() == &Token::Keyword(Keyword::Else) {
+        let alternative = if self.peek_token() == &Token::Keyword(Keyword::Else) {
+            self.next();
             self.next();
             let stmt = self.parse_block_statement()?;
             expect_token!(self.next_token(), &Token::RBrace);

@@ -18,6 +18,6 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         let mut parser = Parser::new(tokens);
         let program = parser.parse().unwrap();
         let evaluated = program.eval();
-        println!("{:?}", evaluated);
+        println!("{}\n", evaluated);
     }
 }

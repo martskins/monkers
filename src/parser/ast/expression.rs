@@ -72,7 +72,7 @@ pub struct PrefixExpression {
 }
 
 impl PrefixExpression {
-    pub fn new(operator: Operator, right: Expression) -> PrefixExpression {
+    pub fn new(operator: Operator, right: Expression) -> Self {
         PrefixExpression {
             operator,
             right: Box::new(right),
@@ -100,7 +100,7 @@ pub struct InfixExpression {
 }
 
 impl InfixExpression {
-    pub fn new(left: Expression, operator: Operator, right: Expression) -> InfixExpression {
+    pub fn new(left: Expression, operator: Operator, right: Expression) -> Self {
         InfixExpression {
             left: Box::new(left),
             operator,
@@ -143,6 +143,16 @@ pub struct IfExpression {
     pub(crate) condition: Box<Expression>,
     pub(crate) consequence: BlockStatement,
     pub(crate) alternative: Option<BlockStatement>,
+}
+
+impl IfExpression {
+    pub fn new(cond: Expression, cons: BlockStatement, alt: Option<BlockStatement>) -> Self {
+        IfExpression {
+            condition: Box::new(cond),
+            consequence: cons,
+            alternative: alt,
+        }
+    }
 }
 
 impl Display for IfExpression {
