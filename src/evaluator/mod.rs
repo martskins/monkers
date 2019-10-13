@@ -1,3 +1,7 @@
+mod result;
+
+use result::*;
+
 use crate::parser::*;
 use std::fmt::{self, Display, Formatter};
 
@@ -37,28 +41,28 @@ impl Display for Object {
 }
 
 pub trait Node {
-    fn eval(&self) -> Object;
+    fn eval(&self) -> Result<Object>;
 }
 
 impl Node for Program {
-    fn eval(&self) -> Object {
+    fn eval(&self) -> Result<Object> {
         let mut result = Object::Null;
         for stmt in self.statements.iter() {
-            result = stmt.eval();
+            result = stmt.eval()?;
             if let Object::ReturnValue(o) = result {
-                return *o;
+                return Ok(*o);
             }
         }
 
-        result
+        Ok(result)
     }
 }
 
 impl Node for Statement {
-    fn eval(&self) -> Object {
+    fn eval(&self) -> Result<Object> {
         match self {
             //     Statement::Let(v) => v.eval(),
-            Statement::Return(v) => Object::ReturnValue(Box::new(v.value.eval())),
+            Statement::Return(v) => Ok(Object::ReturnValue(Box::new(v.value.eval()?))),
             Statement::Expression(v) => v.value.eval(),
             Statement::Block(v) => v.eval(),
             v => unimplemented!("eval not implement for {:?}", v),
@@ -67,26 +71,26 @@ impl Node for Statement {
 }
 
 impl Node for BlockStatement {
-    fn eval(&self) -> Object {
+    fn eval(&self) -> Result<Object> {
         let mut result = Object::Null;
         for stmt in self.statements.iter() {
-            result = stmt.eval();
+            result = stmt.eval()?;
             if let Object::ReturnValue(_) = &result {
-                return result.clone();
+                return Ok(result.clone());
             }
         }
 
-        result
+        Ok(result)
     }
 }
 
 impl Node for Expression {
-    fn eval(&self) -> Object {
+    fn eval(&self) -> Result<Object> {
         match self {
-            Expression::IntegerLiteral(v) => Object::Integer(v.value),
-            Expression::BooleanLiteral(v) => Object::Boolean(v.value),
+            Expression::IntegerLiteral(v) => Ok(Object::Integer(v.value)),
+            Expression::BooleanLiteral(v) => Ok(Object::Boolean(v.value)),
             Expression::If(v) => {
-                let condition = v.condition.eval();
+                let condition = v.condition.eval()?;
                 if condition.is_truthy() {
                     v.consequence.eval()
                 } else {
@@ -94,17 +98,17 @@ impl Node for Expression {
                         return alt.eval();
                     }
 
-                    Object::Null
+                    Ok(Object::Null)
                 }
             }
             Expression::Grouped(v) => v.value.eval(),
             Expression::Infix(v) => {
-                let left = v.left.eval();
-                let right = v.right.eval();
+                let left = v.left.eval()?;
+                let right = v.right.eval()?;
                 eval_infix_expression(&v.operator, left, right)
             }
             Expression::Prefix(v) => {
-                let right = v.right.eval();
+                let right = v.right.eval()?;
                 eval_prefix_expression(&v.operator, right)
             }
             v => unimplemented!("eval not implement for {:?}", v),
@@ -112,57 +116,97 @@ impl Node for Expression {
     }
 }
 
-fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Object {
+fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Result<Object> {
+    // TODO: Work this out so we don't end up with a gazillion lines comparing every possible
+    // combination of left and right.
     match operator {
-        Operator::Eq => Object::Boolean(left == right),
-        Operator::NotEq => Object::Boolean(left != right),
-        Operator::Gt | Operator::Lt => match right {
-            Object::Integer(r) => match left {
-                Object::Integer(l) => {
-                    let val = if operator == &Operator::Gt {
-                        l > r
-                    } else {
-                        l < r
-                    };
-                    Object::Boolean(val)
-                }
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        },
-        Operator::Div => match right {
-            Object::Integer(r) => match left {
-                Object::Integer(l) => Object::Integer(l / r),
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        },
-        Operator::Mul => match right {
-            Object::Integer(r) => match left {
-                Object::Integer(l) => Object::Integer(l * r),
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        },
-        Operator::Minus => match right {
-            Object::Integer(r) => match left {
-                Object::Integer(l) => Object::Integer(l - r),
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        },
-        Operator::Add => match right {
-            Object::Integer(r) => match left {
-                Object::Integer(l) => Object::Integer(l + r),
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        },
+        Operator::Eq => eval_eq_infix_expression(left, right),
+        Operator::NotEq => eval_neq_infix_expression(left, right),
+        Operator::Gt => eval_gt_infix_expression(left, right),
+        Operator::Lt => eval_lt_infix_expression(left, right),
+        Operator::Div => eval_div_infix_expression(left, right),
+        Operator::Mul => eval_mul_infix_expression(left, right),
+        Operator::Minus => eval_minus_infix_expression(left, right),
+        Operator::Add => eval_add_infix_expression(left, right),
         _ => unimplemented!(),
     }
 }
 
-fn eval_prefix_expression(operator: &Operator, right: Object) -> Object {
+fn eval_neq_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l != r),
+        (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l != r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_eq_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l == r),
+        (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l == r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_lt_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l < r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_gt_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l > r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_div_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Integer(l / r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_mul_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Integer(l * r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_minus_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Integer(l - r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_add_infix_expression(left: Object, right: Object) -> Result<Object> {
+    let res = match (left, right) {
+        (Object::Integer(l), Object::Integer(r)) => Object::Integer(l + r),
+        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+    };
+
+    Ok(res)
+}
+
+fn eval_prefix_expression(operator: &Operator, right: Object) -> Result<Object> {
     match operator {
         Operator::Bang => eval_bang_operator(right),
         Operator::Minus => eval_minus_prefix_operator(right),
@@ -170,20 +214,24 @@ fn eval_prefix_expression(operator: &Operator, right: Object) -> Object {
     }
 }
 
-fn eval_minus_prefix_operator(right: Object) -> Object {
-    match right {
+fn eval_minus_prefix_operator(right: Object) -> Result<Object> {
+    let res = match right {
         Object::Integer(v) => Object::Integer(-v),
         _ => unimplemented!(),
-    }
+    };
+
+    Ok(res)
 }
 
-fn eval_bang_operator(right: Object) -> Object {
-    match right {
+fn eval_bang_operator(right: Object) -> Result<Object> {
+    let res = match right {
         Object::Integer(0) => Object::Boolean(true),
         Object::Boolean(v) => Object::Boolean(!v),
         Object::Null => Object::Boolean(true),
         _ => Object::Boolean(false),
-    }
+    };
+
+    Ok(res)
 }
 
 #[cfg(test)]
@@ -195,7 +243,7 @@ mod test {
     #[test]
     fn test_eval_integer_expression() {
         let node = Expression::from(IntegerLiteral { value: 5 });
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(5);
         assert_eq!(expected, actual);
     }
@@ -203,7 +251,7 @@ mod test {
     #[test]
     fn test_eval_boolean_expression() {
         let node = Expression::from(BooleanLiteral { value: true });
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(true);
         assert_eq!(expected, actual);
     }
@@ -214,7 +262,7 @@ mod test {
             Operator::Minus,
             Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(-42);
         assert_eq!(expected, actual);
     }
@@ -225,7 +273,7 @@ mod test {
             Operator::Bang,
             Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(false);
         assert_eq!(expected, actual);
     }
@@ -236,7 +284,7 @@ mod test {
             Operator::Bang,
             Expression::BooleanLiteral(BooleanLiteral { value: true }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(false);
         assert_eq!(expected, actual);
     }
@@ -247,7 +295,7 @@ mod test {
             Operator::Bang,
             Expression::BooleanLiteral(BooleanLiteral { value: false }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(true);
         assert_eq!(expected, actual);
     }
@@ -261,7 +309,7 @@ mod test {
                 Expression::BooleanLiteral(BooleanLiteral { value: false }),
             )),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(false);
         assert_eq!(expected, actual);
     }
@@ -273,7 +321,7 @@ mod test {
             Operator::Gt,
             Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(true);
         assert_eq!(expected, actual);
     }
@@ -285,7 +333,7 @@ mod test {
             Operator::Lt,
             Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Boolean(false);
         assert_eq!(expected, actual);
     }
@@ -297,7 +345,7 @@ mod test {
             Operator::Mul,
             Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -309,7 +357,7 @@ mod test {
             Operator::Div,
             Expression::IntegerLiteral(IntegerLiteral { value: 2 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -321,7 +369,7 @@ mod test {
             Operator::Minus,
             Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -333,7 +381,7 @@ mod test {
             Operator::Add,
             Expression::IntegerLiteral(IntegerLiteral { value: 41 }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -362,7 +410,7 @@ mod test {
             }),
         ));
 
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(1);
         assert_eq!(expected, actual);
     }
@@ -382,7 +430,7 @@ mod test {
                 })],
             }),
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -398,7 +446,7 @@ mod test {
             },
             None,
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Integer(42);
         assert_eq!(expected, actual);
     }
@@ -414,7 +462,7 @@ mod test {
             },
             None,
         ));
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::Null;
         assert_eq!(expected, actual);
     }
@@ -459,7 +507,7 @@ mod test {
             )),
         });
 
-        let actual = outer_if_stmt.eval();
+        let actual = outer_if_stmt.eval().unwrap();
         let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
         assert_eq!(expected, actual);
     }
@@ -477,7 +525,7 @@ mod test {
             ],
         });
 
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
         assert_eq!(expected, actual);
     }
@@ -488,8 +536,42 @@ mod test {
             value: Expression::BooleanLiteral(BooleanLiteral { value: false }),
         });
 
-        let actual = node.eval();
+        let actual = node.eval().unwrap();
         let expected = Object::ReturnValue(Box::new(Object::Boolean(false)));
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_type_mismatch_error_inverse() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+            Operator::Add,
+            Expression::BooleanLiteral(BooleanLiteral { value: true }),
+        ));
+        let actual = node.eval();
+        assert_eq!(
+            actual,
+            Err(EvalError::TypeMismatchError(
+                Object::Integer(1),
+                Object::Boolean(true),
+            ))
+        );
+    }
+
+    #[test]
+    fn test_type_mismatch_error() {
+        let node = Expression::from(InfixExpression::new(
+            Expression::BooleanLiteral(BooleanLiteral { value: true }),
+            Operator::Add,
+            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
+        ));
+        let actual = node.eval();
+        assert_eq!(
+            actual,
+            Err(EvalError::TypeMismatchError(
+                Object::Boolean(true),
+                Object::Integer(1),
+            ))
+        );
     }
 }

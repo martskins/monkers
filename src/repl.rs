@@ -17,7 +17,9 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         let tokens = lexer.lex();
         let mut parser = Parser::new(tokens);
         let program = parser.parse().unwrap();
-        let evaluated = program.eval();
-        println!("{}\n", evaluated);
+        match program.eval() {
+            Ok(res) => println!("{}\n", res),
+            Err(e) => eprintln!("{:?}\n", e),
+        }
     }
 }
