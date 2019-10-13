@@ -136,7 +136,7 @@ fn eval_neq_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l != r),
         (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l != r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -146,7 +146,7 @@ fn eval_eq_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l == r),
         (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l == r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -155,7 +155,7 @@ fn eval_eq_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_lt_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l < r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -164,7 +164,7 @@ fn eval_lt_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_gt_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l > r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -173,7 +173,7 @@ fn eval_gt_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_div_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l / r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -182,7 +182,7 @@ fn eval_div_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_mul_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l * r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -191,7 +191,7 @@ fn eval_mul_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_minus_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l - r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -200,7 +200,7 @@ fn eval_minus_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_add_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l + r),
-        (l, r) => return Err(EvalError::TypeMismatchError(l, r)),
+        (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
     Ok(res)
@@ -240,374 +240,133 @@ mod test {
     use crate::lexer::*;
     use crate::parser::*;
 
+    macro_rules! should_err {
+        ($input:expr, $expect:expr) => {
+            let mut env = Environment::new();
+            let mut parser = Parser::from($input);
+            let program = parser.parse().unwrap();
+            let actual = program.eval(&mut env);
+            assert_eq!(Err($expect), actual);
+        };
+    }
+
+    macro_rules! should_eval {
+        ($input:expr, $expect:expr) => {
+            let mut env = Environment::new();
+            let mut parser = Parser::from($input);
+            let program = parser.parse().unwrap();
+            let actual = program.eval(&mut env).unwrap();
+            assert_eq!($expect, actual);
+        };
+    }
+
     #[test]
     fn test_eval_integer_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(IntegerLiteral { value: 5 });
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(5);
-        assert_eq!(expected, actual);
+        should_eval!("5;", Object::Integer(5));
+        should_eval!("10 + 5;", Object::Integer(15));
     }
 
     #[test]
     fn test_eval_boolean_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(BooleanLiteral { value: true });
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(true);
-        assert_eq!(expected, actual);
+        should_eval!("false;", Object::Boolean(false));
+        should_eval!("true;", Object::Boolean(true));
+        should_eval!("true != false;", Object::Boolean(true));
+        should_eval!("5 < 3", Object::Boolean(false));
     }
 
     #[test]
-    fn test_minus_operator_on_number_returns_its_opposite_value() {
-        let mut env = Environment::new();
-        let node = Expression::from(PrefixExpression::new(
-            Operator::Minus,
-            Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(-42);
-        assert_eq!(expected, actual);
+    fn minus_operator() {
+        should_eval!("-42;", Object::Integer(-42));
+        should_eval!("--42;", Object::Integer(42));
     }
 
     #[test]
-    fn test_bang_operator_on_number_returns_false() {
-        let mut env = Environment::new();
-        let node = Expression::from(PrefixExpression::new(
-            Operator::Bang,
-            Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(false);
-        assert_eq!(expected, actual);
+    fn bang_operator() {
+        should_eval!("!5;", Object::Boolean(false));
+        should_eval!("!true;", Object::Boolean(false));
+        should_eval!("!false;", Object::Boolean(true));
+        should_eval!("!!true;", Object::Boolean(true));
     }
 
     #[test]
-    fn test_bang_operator_on_true_returns_false() {
-        let mut env = Environment::new();
-        let node = Expression::from(PrefixExpression::new(
-            Operator::Bang,
-            Expression::BooleanLiteral(BooleanLiteral { value: true }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(false);
-        assert_eq!(expected, actual);
+    fn greater_than_expression() {
+        should_eval!("5 > 3;", Object::Boolean(true));
+        should_eval!("1 > 3;", Object::Boolean(false));
     }
 
     #[test]
-    fn test_bang_operator_on_false_returns_true() {
-        let mut env = Environment::new();
-        let node = Expression::from(PrefixExpression::new(
-            Operator::Bang,
-            Expression::BooleanLiteral(BooleanLiteral { value: false }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(true);
-        assert_eq!(expected, actual);
+    fn less_than_expression() {
+        should_eval!("5 < 3;", Object::Boolean(false));
+        should_eval!("1 < 3;", Object::Boolean(true));
     }
 
     #[test]
-    fn test_double_bang_operator_on_boolean_leaves_it_unchanged() {
-        let mut env = Environment::new();
-        let node = Expression::from(PrefixExpression::new(
-            Operator::Bang,
-            Expression::Prefix(PrefixExpression::new(
-                Operator::Bang,
-                Expression::BooleanLiteral(BooleanLiteral { value: false }),
-            )),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(false);
-        assert_eq!(expected, actual);
+    fn multiplication_expression() {
+        should_eval!("7 * 6;", Object::Integer(42));
+        should_eval!("7 * -6;", Object::Integer(-42));
+        should_eval!("-7 * -6;", Object::Integer(42));
+        should_eval!("-7 * 6;", Object::Integer(-42));
     }
 
     #[test]
-    fn test_eval_infix_greater_than_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
-            Operator::Gt,
-            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(true);
-        assert_eq!(expected, actual);
+    fn division_expression() {
+        should_eval!("36 / 6;", Object::Integer(6));
+        should_eval!("36 / -6;", Object::Integer(-6));
+        should_eval!("-36 / -6;", Object::Integer(6));
+        should_eval!("-36 / 6;", Object::Integer(-6));
     }
 
     #[test]
-    fn test_eval_infix_less_than_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
-            Operator::Lt,
-            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Boolean(false);
-        assert_eq!(expected, actual);
+    fn subtraction_expression() {
+        should_eval!("6 - 6;", Object::Integer(0));
+        should_eval!("20 - 6;", Object::Integer(14));
+        should_eval!("20 - -6;", Object::Integer(26));
     }
 
     #[test]
-    fn test_eval_infix_multiplication_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 7 }),
-            Operator::Mul,
-            Expression::IntegerLiteral(IntegerLiteral { value: 6 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
+    fn addition_expression() {
+        should_eval!("-6 + -6;", Object::Integer(-12));
+        should_eval!("20 + 6;", Object::Integer(26));
+        should_eval!("20 + -6;", Object::Integer(14));
     }
 
     #[test]
-    fn test_eval_infix_division_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 84 }),
-            Operator::Div,
-            Expression::IntegerLiteral(IntegerLiteral { value: 2 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
+    fn if_expression() {
+        should_eval!("if (true) { 10 } else { 1 }", Object::Integer(10));
+        should_eval!("if (true) { 10 }", Object::Integer(10));
+        should_eval!("if (false) { 10 }", Object::Null);
+        should_eval!(
+            "if (true) { if (true) { 10 } } else { 1 } ",
+            Object::Integer(10)
+        );
+        should_eval!(
+            "if (true) { if (true) { return 10; } return 12; } else { 1 } ",
+            Object::Integer(10)
+        );
     }
 
     #[test]
-    fn test_eval_infix_subtraction_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 43 }),
-            Operator::Minus,
-            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
+    fn return_statement() {
+        should_eval!("return 10; return 1;", Object::Integer(10));
+        should_eval!("5; return 10;", Object::Integer(10));
+        should_eval!("5; return 10; 15", Object::Integer(10));
     }
 
     #[test]
-    fn test_eval_infix_addition_expression() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-            Operator::Add,
-            Expression::IntegerLiteral(IntegerLiteral { value: 41 }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_eval_if_expression_with_else_and_non_trivial_condition() {
-        let mut env = Environment::new();
-        let node = Expression::from(IfExpression::new(
-            Expression::If(IfExpression::new(
-                Expression::BooleanLiteral(BooleanLiteral { value: false }),
-                BlockStatement {
-                    statements: vec![Statement::Expression(ExpressionStatement {
-                        value: Expression::BooleanLiteral(BooleanLiteral { value: true }),
-                    })],
-                },
-                None,
-            )),
-            BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-                })],
-            },
-            Some(BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-                })],
-            }),
-        ));
-
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(1);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_eval_if_expression_with_else() {
-        let mut env = Environment::new();
-        let node = Expression::from(IfExpression::new(
-            Expression::BooleanLiteral(BooleanLiteral { value: true }),
-            BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-                })],
-            },
-            Some(BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-                })],
-            }),
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_eval_if_expression_without_else() {
-        let mut env = Environment::new();
-        let node = Expression::from(IfExpression::new(
-            Expression::BooleanLiteral(BooleanLiteral { value: true }),
-            BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-                })],
-            },
-            None,
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(42);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_eval_if_expression_evaluates_to_null_on_falsy_condition_with_no_else() {
-        let mut env = Environment::new();
-        let node = Expression::from(IfExpression::new(
-            Expression::BooleanLiteral(BooleanLiteral { value: false }),
-            BlockStatement {
-                statements: vec![Statement::Expression(ExpressionStatement {
-                    value: Expression::IntegerLiteral(IntegerLiteral { value: 42 }),
-                })],
-            },
-            None,
-        ));
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Null;
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_nested_return_statements() {
-        let mut env = Environment::new();
-        // if (10 < 12) {
-        //      if (true) {
-        //          return true;
-        //      }
-        //      return false;
-        //  }
-
-        let inner_if_stmt = Statement::Expression(ExpressionStatement {
-            value: Expression::from(IfExpression::new(
-                Expression::BooleanLiteral(BooleanLiteral { value: true }),
-                BlockStatement {
-                    statements: vec![Statement::Return(ReturnStatement {
-                        value: Expression::from(BooleanLiteral { value: true }),
-                    })],
-                },
-                None,
-            )),
-        });
-
-        let outer_if_stmt = Statement::from(ExpressionStatement {
-            value: Expression::from(IfExpression::new(
-                Expression::Infix(InfixExpression::new(
-                    Expression::from(IntegerLiteral { value: 10 }),
-                    Operator::Lt,
-                    Expression::from(IntegerLiteral { value: 12 }),
-                )),
-                BlockStatement {
-                    statements: vec![
-                        inner_if_stmt,
-                        Statement::Return(ReturnStatement {
-                            value: Expression::from(BooleanLiteral { value: false }),
-                        }),
-                    ],
-                },
-                None,
-            )),
-        });
-
-        let actual = outer_if_stmt.eval(&mut env).unwrap();
-        let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_return_statement_with_leading_statements() {
-        let mut env = Environment::new();
-        let node = Statement::from(BlockStatement {
-            statements: vec![
-                Statement::Return(ReturnStatement {
-                    value: Expression::BooleanLiteral(BooleanLiteral { value: true }),
-                }),
-                Statement::Return(ReturnStatement {
-                    value: Expression::BooleanLiteral(BooleanLiteral { value: false }),
-                }),
-            ],
-        });
-
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::ReturnValue(Box::new(Object::Boolean(true)));
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_return_statement() {
-        let mut env = Environment::new();
-        let node = Statement::from(ReturnStatement {
-            value: Expression::BooleanLiteral(BooleanLiteral { value: false }),
-        });
-
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::ReturnValue(Box::new(Object::Boolean(false)));
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_type_mismatch_error_inverse() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-            Operator::Add,
-            Expression::BooleanLiteral(BooleanLiteral { value: true }),
-        ));
-        let actual = node.eval(&mut env);
-        let expected = Err(EvalError::TypeMismatchError(
-            Object::Integer(1),
-            Object::Boolean(true),
-        ));
-        assert_eq!(expected, actual,);
-    }
-
-    #[test]
-    fn test_type_mismatch_error() {
-        let mut env = Environment::new();
-        let node = Expression::from(InfixExpression::new(
-            Expression::BooleanLiteral(BooleanLiteral { value: true }),
-            Operator::Add,
-            Expression::IntegerLiteral(IntegerLiteral { value: 1 }),
-        ));
-        let actual = node.eval(&mut env);
-        let expected = Err(EvalError::TypeMismatchError(
-            Object::Boolean(true),
-            Object::Integer(1),
-        ));
-        assert_eq!(expected, actual,);
+    fn type_mismatch_error() {
+        should_err!(
+            "5 + false",
+            EvalError::TypeMismatch(Object::Integer(5), Object::Boolean(false))
+        );
+        should_err!(
+            "5 / false",
+            EvalError::TypeMismatch(Object::Integer(5), Object::Boolean(false))
+        );
     }
 
     #[test]
     fn eval_simple_let_statement() {
-        let mut env = Environment::new();
-        let statements = vec![
-            Statement::from(LetStatement {
-                name: Identifier { value: "x".into() },
-                value: Expression::from(IntegerLiteral { value: 5 }),
-            }),
-            Statement::from(ExpressionStatement {
-                value: Expression::from(Identifier { value: "x".into() }),
-            }),
-        ];
-        let node = Program { statements };
-        let actual = node.eval(&mut env).unwrap();
-        let expected = Object::Integer(5);
-        assert_eq!(expected, actual,);
+        should_eval!("let a = 5; a;", Object::Integer(5));
+        should_eval!("let a = 5; let b = a; b", Object::Integer(5));
     }
 }

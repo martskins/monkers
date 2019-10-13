@@ -4,7 +4,7 @@ mod result;
 pub use ast::*;
 pub use result::*;
 
-use crate::lexer::{Keyword, Token};
+use crate::lexer::{Keyword, Lexer, Token};
 use precedence::Precedence;
 use result::{ParseError, Result};
 
@@ -23,6 +23,17 @@ macro_rules! expect_token {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
+        let parser = Parser {
+            tokens,
+            position: 0,
+        };
+
+        parser
+    }
+
+    pub fn from(input: &str) -> Parser {
+        let mut lexer = Lexer::new(input);
+        let tokens = lexer.lex();
         let parser = Parser {
             tokens,
             position: 0,

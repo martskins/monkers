@@ -7,7 +7,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(input: String) -> Lexer {
+    pub fn new(input: &str) -> Lexer {
         Lexer {
             position: 0,
             chars: input.chars().collect(),

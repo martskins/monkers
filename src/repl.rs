@@ -15,7 +15,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         let mut line = String::new();
         input.read_line(&mut line)?;
 
-        let mut lexer = Lexer::new(line);
+        let mut lexer = Lexer::new(line.as_str());
         let tokens = lexer.lex();
         let mut parser = Parser::new(tokens);
         let program = parser.parse().unwrap();
