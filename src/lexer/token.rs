@@ -22,6 +22,7 @@ pub enum Token {
     RBrace,
     Identifier(String),
     Number(String),
+    String(String),
     Keyword(Keyword),
 }
 

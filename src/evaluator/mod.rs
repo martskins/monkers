@@ -65,6 +65,7 @@ impl Node for Expression {
         match self {
             Expression::IntegerLiteral(v) => Ok(Object::Integer(v.value)),
             Expression::BooleanLiteral(v) => Ok(Object::Boolean(v.value)),
+            Expression::StringLiteral(v) => Ok(Object::String(v.value.clone())),
             Expression::If(v) => {
                 let condition = v.condition.eval(env.clone())?;
                 if condition.is_truthy() {
@@ -254,6 +255,7 @@ fn eval_bang_operator(right: Object) -> Result<Object> {
     let res = match right {
         Object::Integer(0) => Object::Boolean(true),
         Object::Boolean(v) => Object::Boolean(!v),
+        Object::String(s) => Object::Boolean(s.is_empty()),
         Object::Null => Object::Boolean(true),
         _ => Object::Boolean(false),
     };
@@ -264,8 +266,6 @@ fn eval_bang_operator(right: Object) -> Result<Object> {
 #[cfg(test)]
 mod test {
     use crate::evaluator::*;
-    use crate::lexer::*;
-    use crate::parser::*;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -287,6 +287,12 @@ mod test {
             let actual = program.eval(env).unwrap();
             assert_eq!($expect, actual);
         };
+    }
+
+    #[test]
+    fn test_strings() {
+        should_eval!("\"foobar\"", Object::String(String::from("foobar")));
+        should_eval!("\"foo bar\"", Object::String(String::from("foo bar")));
     }
 
     #[test]
@@ -315,6 +321,8 @@ mod test {
         should_eval!("!true;", Object::Boolean(false));
         should_eval!("!false;", Object::Boolean(true));
         should_eval!("!!true;", Object::Boolean(true));
+        should_eval!("!\"\";", Object::Boolean(true));
+        should_eval!("!\"asdasd\";", Object::Boolean(false));
     }
 
     #[test]
@@ -400,7 +408,7 @@ mod test {
     }
 
     #[test]
-    fn eval_functions() {
+    fn functions() {
         should_eval!(
             "let ident = fn(x) { return x; }; ident(5);",
             Object::Integer(5)
@@ -420,10 +428,6 @@ mod test {
         should_eval!(
             "let sub = fn(x, y) { x - y; }; sub(5, 3);",
             Object::Integer(2)
-        );
-        should_eval!(
-            "let add = fn(x, y) { x + add(x, y); }; add(5, 3);",
-            Object::Integer(13)
         );
     }
 }

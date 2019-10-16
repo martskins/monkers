@@ -74,8 +74,9 @@ impl Parser {
 
     fn prefix_parse_fn(&mut self, token: Token) -> Result<Expression> {
         match token {
-            Token::Identifier(_) => self.parse_identifier_expression(),
             Token::Number(_) => self.parse_integer_literal_expression(),
+            Token::String(_) => self.parse_string_literal_expression(),
+            Token::Identifier(_) => self.parse_identifier_expression(),
             Token::LParen => self.parse_grouped_expression(),
             Token::Keyword(k) => match k {
                 Keyword::True | Keyword::False => self.parse_boolean_expression(),
@@ -260,6 +261,21 @@ impl Parser {
         Ok(Expression::Prefix(PrefixExpression { operator, right }))
     }
 
+    fn parse_string_literal(&self) -> Result<StringLiteral> {
+        if let Token::String(value) = self.current_token() {
+            let result = StringLiteral {
+                value: value.clone(),
+            };
+            Ok(result)
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn parse_string_literal_expression(&self) -> Result<Expression> {
+        Ok(Expression::StringLiteral(self.parse_string_literal()?))
+    }
+
     fn parse_boolean_expression(&self) -> Result<Expression> {
         let result = match self.current_token() {
             Token::Keyword(Keyword::True) => BooleanLiteral { value: true },
@@ -385,6 +401,16 @@ mod test {
             assert_ne!(0, program.statements.len());
             assert_eq!($expect, program.statements[0]);
         };
+    }
+
+    #[test]
+    fn parse_string_literal() {
+        let parser = parser_from("\"foobar\"");
+        let actual = parser.parse_string_literal().unwrap();
+        let expect = StringLiteral {
+            value: "foobar".into(),
+        };
+        assert_eq!(expect, actual);
     }
 
     #[test]

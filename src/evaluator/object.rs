@@ -9,6 +9,7 @@ pub enum Object {
     Null,
     Integer(i64),
     Boolean(bool),
+    String(String),
     Function {
         parameters: Vec<Identifier>,
         body: BlockStatement,
@@ -22,6 +23,7 @@ impl Object {
         match self {
             Object::Null => false,
             Object::Integer(0) => false,
+            Object::String(s) => !s.is_empty(),
             Object::Boolean(false) => false,
             _ => true,
         }
@@ -34,6 +36,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::Integer(v) => write!(f, "{}", v),
             Object::Boolean(v) => write!(f, "{}", v),
+            Object::String(v) => write!(f, "{}", v),
             Object::ReturnValue(v) => write!(f, "{}", v),
             Object::Function {
                 parameters,

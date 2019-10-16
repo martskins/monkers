@@ -24,17 +24,18 @@ impl Lexer {
         self.position -= 1;
     }
 
-    // fn next(&mut self) {
-    //     self.position += 1;
-    // }
+    fn lex_string(&mut self) -> Token {
+        let mut value = String::new();
+        let mut c = self.read();
+        while c != &'"' {
+            value.push(c.clone());
+            c = self.read();
+        }
 
-    // fn peek(&self) -> &char {
-    //     self.chars
-    //         .get(self.position + 1)
-    //         .expect("could not read char")
-    // }
+        Token::String(value)
+    }
 
-    fn read_number(&mut self) -> Token {
+    fn lex_number(&mut self) -> Token {
         let mut value = String::new();
         let mut c = self.read();
         while c.is_numeric() {
@@ -46,7 +47,7 @@ impl Lexer {
         Token::Number(value)
     }
 
-    fn read_identifier(&mut self) -> Token {
+    fn lex_identifier(&mut self) -> Token {
         let mut value = String::new();
         let mut c = self.read();
         while c.is_alphabetic() {
@@ -104,12 +105,13 @@ impl Lexer {
             ' ' | '\t' | '\n' | '\r' => self.next_token(),
             'a'..='z' | 'A'..='Z' | '_' => {
                 self.back();
-                self.read_identifier()
+                self.lex_identifier()
             }
             '0'..='9' => {
                 self.back();
-                self.read_number()
+                self.lex_number()
             }
+            '"' => self.lex_string(),
             c => panic!("unrecognized character {}", c),
         }
     }
@@ -154,6 +156,9 @@ mod test {
 
                         10 == 10;
                         10 != 9;
+
+                        "foobar";
+                        "foo bar";
                         "#;
 
         let mut lexer = Lexer::new(input.into());
@@ -237,6 +242,11 @@ mod test {
         assert_eq!(Token::Number("10".into()), lexer.next_token());
         assert_eq!(Token::NotEq, lexer.next_token());
         assert_eq!(Token::Number("9".into()), lexer.next_token());
+        assert_eq!(Token::Semicolon, lexer.next_token());
+
+        assert_eq!(Token::String("foobar".into()), lexer.next_token());
+        assert_eq!(Token::Semicolon, lexer.next_token());
+        assert_eq!(Token::String("foo bar".into()), lexer.next_token());
         assert_eq!(Token::Semicolon, lexer.next_token());
     }
 }

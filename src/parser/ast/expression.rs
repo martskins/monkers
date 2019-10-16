@@ -7,6 +7,7 @@ pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     BooleanLiteral(BooleanLiteral),
+    StringLiteral(StringLiteral),
     If(IfExpression),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
@@ -21,6 +22,7 @@ impl Display for Expression {
             Expression::Identifier(v) => write!(f, "{}", v),
             Expression::IntegerLiteral(v) => write!(f, "{}", v),
             Expression::BooleanLiteral(v) => write!(f, "{}", v),
+            Expression::StringLiteral(v) => write!(f, "{}", v),
             Expression::If(v) => write!(f, "{}", v),
             Expression::Prefix(v) => write!(f, "{}", v),
             Expression::Infix(v) => write!(f, "{}", v),
@@ -28,6 +30,23 @@ impl Display for Expression {
             Expression::Call(v) => write!(f, "{}", v),
             Expression::Grouped(v) => write!(f, "{}", v),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StringLiteral {
+    pub(crate) value: String,
+}
+
+impl Display for StringLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl From<StringLiteral> for Expression {
+    fn from(f: StringLiteral) -> Self {
+        Expression::StringLiteral(f)
     }
 }
 
