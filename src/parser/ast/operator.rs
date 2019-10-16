@@ -1,7 +1,7 @@
 use crate::lexer::Token;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Minus,
     Add,

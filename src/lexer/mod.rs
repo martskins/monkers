@@ -102,7 +102,7 @@ impl Lexer {
             '/' => Token::Slash,
             '*' => Token::Asterisk,
             ' ' | '\t' | '\n' | '\r' => self.next_token(),
-            'a'..='z' | 'A'..='Z' => {
+            'a'..='z' | 'A'..='Z' | '_' => {
                 self.back();
                 self.read_identifier()
             }

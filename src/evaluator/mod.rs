@@ -1,42 +1,27 @@
+mod environment;
 mod object;
 mod result;
 
 use crate::parser::*;
+pub use environment::Environment;
 use object::Object;
 use result::*;
-use std::collections::HashMap;
-use std::fmt::{self, Display, Formatter};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // TODO: Figure out a way to use a static reference to Boolean instead of creating
 // an instance of Object::Boolean every time we eval one.
 // static TRUE: &'static Object = &Object::Boolean(true);
 // static FALSE: &'static Object = &Object::Boolean(true);
-
-pub struct Environment(HashMap<String, Object>);
-
-impl Environment {
-    pub fn new() -> Self {
-        Environment(HashMap::new())
-    }
-
-    fn set(&mut self, name: &str, val: Object) {
-        self.0.insert(name.to_owned(), val);
-    }
-
-    fn get(&mut self, name: &str) -> Option<&Object> {
-        self.0.get(name)
-    }
-}
-
 pub trait Node {
-    fn eval(&self, env: &mut Environment) -> Result<Object>;
+    fn eval(&self, env: Rc<RefCell<Environment>>) -> Result<Object>;
 }
 
 impl Node for Program {
-    fn eval(&self, env: &mut Environment) -> Result<Object> {
+    fn eval(&self, env: Rc<RefCell<Environment>>) -> Result<Object> {
         let mut result = Object::Null;
         for stmt in self.statements.iter() {
-            result = stmt.eval(env)?;
+            result = stmt.eval(env.clone())?;
             if let Object::ReturnValue(o) = result {
                 return Ok(*o);
             }
@@ -47,26 +32,25 @@ impl Node for Program {
 }
 
 impl Node for Statement {
-    fn eval(&self, env: &mut Environment) -> Result<Object> {
+    fn eval(&self, env: Rc<RefCell<Environment>>) -> Result<Object> {
         match self {
             Statement::Let(v) => {
-                let val = v.value.eval(env)?;
-                env.set(&v.name.value, val.clone());
+                let val: Object = v.value.eval(env.clone())?;
+                env.borrow_mut().set(&v.name.value, val.clone());
                 Ok(val)
             }
             Statement::Return(v) => Ok(Object::ReturnValue(Box::new(v.value.eval(env)?))),
             Statement::Expression(v) => v.value.eval(env),
             Statement::Block(v) => v.eval(env),
-            v => unimplemented!("eval not implement for {:?}", v),
         }
     }
 }
 
 impl Node for BlockStatement {
-    fn eval(&self, env: &mut Environment) -> Result<Object> {
+    fn eval(&self, env: Rc<RefCell<Environment>>) -> Result<Object> {
         let mut result = Object::Null;
         for stmt in self.statements.iter() {
-            result = stmt.eval(env)?;
+            result = stmt.eval(env.clone())?;
             if let Object::ReturnValue(_) = &result {
                 return Ok(result.clone());
             }
@@ -77,14 +61,14 @@ impl Node for BlockStatement {
 }
 
 impl Node for Expression {
-    fn eval(&self, env: &mut Environment) -> Result<Object> {
+    fn eval(&self, env: Rc<RefCell<Environment>>) -> Result<Object> {
         match self {
             Expression::IntegerLiteral(v) => Ok(Object::Integer(v.value)),
             Expression::BooleanLiteral(v) => Ok(Object::Boolean(v.value)),
             Expression::If(v) => {
-                let condition = v.condition.eval(env)?;
+                let condition = v.condition.eval(env.clone())?;
                 if condition.is_truthy() {
-                    v.consequence.eval(env)
+                    v.consequence.eval(env.clone())
                 } else {
                     if let Some(alt) = &v.alternative {
                         return alt.eval(env);
@@ -95,8 +79,8 @@ impl Node for Expression {
             }
             Expression::Grouped(v) => v.value.eval(env),
             Expression::Infix(v) => {
-                let left = v.left.eval(env)?;
-                let right = v.right.eval(env)?;
+                let left = v.left.eval(env.clone())?;
+                let right = v.right.eval(env.clone())?;
                 eval_infix_expression(&v.operator, left, right)
             }
             Expression::Prefix(v) => {
@@ -104,16 +88,59 @@ impl Node for Expression {
                 eval_prefix_expression(&v.operator, right)
             }
             Expression::Identifier(v) => {
-                let val = env.get(&v.value);
+                let val = env.borrow().get(&v.value);
                 if let None = val {
                     return Err(EvalError::UnknownIdentifier(v.value.clone()));
                 }
 
                 Ok(val.unwrap().clone())
             }
-            v => unimplemented!("eval not implement for {:?}", v),
+            Expression::Function(v) => {
+                let res = Object::Function {
+                    parameters: v.parameters.clone(),
+                    body: v.body.clone(),
+                    env: env.clone(),
+                };
+                Ok(res)
+            }
+            Expression::Call(v) => eval_call_expression(v, env),
         }
     }
+}
+
+fn eval_call_expression(call: &CallExpression, env: Rc<RefCell<Environment>>) -> Result<Object> {
+    let fun = call.function.eval(env.clone())?;
+    let args = eval_expressions(&call.arguments, env.clone())?;
+    if let Object::Function {
+        parameters,
+        body,
+        env: fn_env,
+    } = fun
+    {
+        let new_env = Rc::new(RefCell::new(Environment::from(fn_env)));
+        for (idx, arg) in parameters.iter().enumerate() {
+            new_env.borrow_mut().set(&arg.value, args[idx].clone());
+        }
+
+        let value = body.eval(new_env)?;
+        if let Object::ReturnValue(r) = value {
+            return Ok(*r);
+        }
+
+        Ok(value)
+    } else {
+        unreachable!();
+    }
+}
+
+fn eval_expressions(exprs: &[Expression], env: Rc<RefCell<Environment>>) -> Result<Vec<Object>> {
+    let mut result = vec![];
+
+    for expr in exprs {
+        let val = expr.eval(env.clone())?;
+        result.push(val);
+    }
+    Ok(result)
 }
 
 fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Result<Object> {
@@ -239,23 +266,25 @@ mod test {
     use crate::evaluator::*;
     use crate::lexer::*;
     use crate::parser::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     macro_rules! should_err {
         ($input:expr, $expect:expr) => {
-            let mut env = Environment::new();
+            let env = Rc::new(RefCell::new(Environment::new()));
             let mut parser = Parser::from($input);
             let program = parser.parse().unwrap();
-            let actual = program.eval(&mut env);
+            let actual = program.eval(env);
             assert_eq!(Err($expect), actual);
         };
     }
 
     macro_rules! should_eval {
         ($input:expr, $expect:expr) => {
-            let mut env = Environment::new();
+            let env = Rc::new(RefCell::new(Environment::new()));
             let mut parser = Parser::from($input);
             let program = parser.parse().unwrap();
-            let actual = program.eval(&mut env).unwrap();
+            let actual = program.eval(env).unwrap();
             assert_eq!($expect, actual);
         };
     }
@@ -365,8 +394,36 @@ mod test {
     }
 
     #[test]
-    fn eval_simple_let_statement() {
+    fn let_statements() {
         should_eval!("let a = 5; a;", Object::Integer(5));
         should_eval!("let a = 5; let b = a; b", Object::Integer(5));
+    }
+
+    #[test]
+    fn eval_functions() {
+        should_eval!(
+            "let ident = fn(x) { return x; }; ident(5);",
+            Object::Integer(5)
+        );
+        should_eval!(
+            "let ident = fn(x) { return x; }; ident(5);",
+            Object::Integer(5)
+        );
+        should_eval!(
+            "let double = fn(x) { 2 * x; }; double(5);",
+            Object::Integer(10)
+        );
+        should_eval!(
+            "let add = fn(x, y) { x + y; }; add(5, 3);",
+            Object::Integer(8)
+        );
+        should_eval!(
+            "let sub = fn(x, y) { x - y; }; sub(5, 3);",
+            Object::Integer(2)
+        );
+        should_eval!(
+            "let add = fn(x, y) { x + add(x, y); }; add(5, 3);",
+            Object::Integer(13)
+        );
     }
 }

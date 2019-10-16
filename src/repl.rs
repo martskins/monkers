@@ -1,12 +1,14 @@
 use crate::evaluator::{Environment, Node};
-use crate::lexer::{Lexer, Token};
-use crate::parser::{Parser, Program};
+use crate::lexer::Lexer;
+use crate::parser::Parser;
+use std::cell::RefCell;
 use std::io::{BufRead, Result, Write};
+use std::rc::Rc;
 
 static PROMPT: &[u8; 2] = &['>' as u8, ' ' as u8];
 
 pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         output.write_all(PROMPT)?;
@@ -19,7 +21,7 @@ pub fn start(mut input: impl BufRead, mut output: impl Write) -> Result<()> {
         let tokens = lexer.lex();
         let mut parser = Parser::new(tokens);
         let program = parser.parse().unwrap();
-        match program.eval(&mut env) {
+        match program.eval(env.clone()) {
             Ok(res) => println!("{}\n", res),
             Err(e) => eprintln!("{:?}\n", e),
         }

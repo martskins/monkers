@@ -2,7 +2,7 @@ use super::operator::Operator;
 use super::statement::BlockStatement;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
@@ -31,7 +31,7 @@ impl Display for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Identifier {
     pub(crate) value: String,
 }
@@ -48,7 +48,7 @@ impl From<Identifier> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IntegerLiteral {
     pub(crate) value: i64,
 }
@@ -65,7 +65,7 @@ impl From<IntegerLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub(crate) operator: Operator,
     pub(crate) right: Box<Expression>,
@@ -92,7 +92,7 @@ impl From<PrefixExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InfixExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) operator: Operator,
@@ -121,7 +121,7 @@ impl From<InfixExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BooleanLiteral {
     pub(crate) value: bool,
 }
@@ -138,7 +138,7 @@ impl From<BooleanLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     pub(crate) condition: Box<Expression>,
     pub(crate) consequence: BlockStatement,
@@ -172,7 +172,7 @@ impl From<IfExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub(crate) parameters: Vec<Identifier>,
     pub(crate) body: BlockStatement,
@@ -199,7 +199,7 @@ impl From<FunctionLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
     pub(crate) function: Box<Expression>,
     pub(crate) arguments: Vec<Expression>,
@@ -226,7 +226,7 @@ impl From<CallExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GroupedExpression {
     pub(crate) value: Box<Expression>,
 }

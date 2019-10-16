@@ -125,6 +125,7 @@ impl Parser {
             self.next();
         }
 
+        self.next(); // skip RParen
         Ok(arguments)
     }
 
@@ -377,9 +378,18 @@ mod test {
         parser.parse().unwrap()
     }
 
+    macro_rules! should_parse {
+        ($input:expr, $expect:expr) => {
+            let mut parser = Parser::from($input);
+            let program = parser.parse().unwrap();
+            assert_ne!(0, program.statements.len());
+            assert_eq!($expect, program.statements[0]);
+        };
+    }
+
     #[test]
     fn parse_call_expression() {
-        let mut parser = parser_from("add(1, 2 * 3, 4 + 5");
+        let mut parser = parser_from("add(1, 2 * 3, 4 + 5)");
         let actual = parser.parse_expression(Precedence::Lowest).unwrap();
         let expect = Expression::from(CallExpression {
             function: Box::new(Expression::from(Identifier {
@@ -401,6 +411,24 @@ mod test {
         });
 
         assert_eq!(expect, actual);
+    }
+
+    #[test]
+    fn parse_function_statement() {
+        let expect = Statement::from(LetStatement {
+            name: Identifier {
+                value: "ident".into(),
+            },
+            value: Expression::from(FunctionLiteral {
+                parameters: vec![Identifier { value: "x".into() }],
+                body: BlockStatement {
+                    statements: vec![Statement::from(ReturnStatement {
+                        value: Expression::from(Identifier { value: "x".into() }),
+                    })],
+                },
+            }),
+        });
+        should_parse!("let ident = fn(x) { return x; }; ident(2);", expect);
     }
 
     #[test]

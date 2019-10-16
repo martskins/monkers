@@ -1,7 +1,7 @@
 use super::expression::*;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
@@ -20,7 +20,7 @@ impl Display for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
     pub(crate) name: Identifier,
     pub(crate) value: Expression,
@@ -38,7 +38,7 @@ impl From<LetStatement> for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     pub(crate) value: Expression,
 }
@@ -55,7 +55,7 @@ impl From<ReturnStatement> for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExpressionStatement {
     pub(crate) value: Expression,
 }
@@ -72,7 +72,7 @@ impl From<ExpressionStatement> for Statement {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
     pub(crate) statements: Vec<Statement>,
 }
