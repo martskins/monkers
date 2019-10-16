@@ -145,8 +145,6 @@ fn eval_expressions(exprs: &[Expression], env: Rc<RefCell<Environment>>) -> Resu
 }
 
 fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Result<Object> {
-    // TODO: Work this out so we don't end up with a gazillion lines comparing every possible
-    // combination of left and right.
     match operator {
         Operator::Eq => eval_eq_infix_expression(left, right),
         Operator::NotEq => eval_neq_infix_expression(left, right),
@@ -228,6 +226,7 @@ fn eval_minus_infix_expression(left: Object, right: Object) -> Result<Object> {
 fn eval_add_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l + r),
+        (Object::String(l), Object::String(r)) => Object::String(format!("{}{}", l, r)),
         (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
@@ -361,10 +360,14 @@ mod test {
     }
 
     #[test]
-    fn addition_expression() {
+    fn add_expression() {
         should_eval!("-6 + -6;", Object::Integer(-12));
         should_eval!("20 + 6;", Object::Integer(26));
         should_eval!("20 + -6;", Object::Integer(14));
+        should_eval!(
+            "\"hello \" + \"world\";",
+            Object::String(String::from("hello world"))
+        );
     }
 
     #[test]
