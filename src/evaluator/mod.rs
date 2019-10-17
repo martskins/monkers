@@ -4,7 +4,7 @@ mod result;
 
 use crate::parser::*;
 pub use environment::Environment;
-use object::Object;
+use object::{BuiltinFunction, Function, Object};
 use result::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -88,20 +88,23 @@ impl Node for Expression {
                 let right = v.right.eval(env)?;
                 eval_prefix_expression(&v.operator, right)
             }
-            Expression::Identifier(v) => {
-                let val = env.borrow().get(&v.value);
-                if let None = val {
-                    return Err(EvalError::UnknownIdentifier(v.value.clone()));
-                }
+            Expression::Identifier(v) => match v.value.as_str() {
+                "len" => Ok(Object::BuiltinFunction(BuiltinFunction::Len)),
+                _ => {
+                    let val = env.borrow().get(&v.value);
+                    if val.is_none() {
+                        return Err(EvalError::UnknownIdentifier(v.value.clone()));
+                    }
 
-                Ok(val.unwrap().clone())
-            }
+                    Ok(val.unwrap().clone())
+                }
+            },
             Expression::Function(v) => {
-                let res = Object::Function {
+                let res = Object::Function(Function {
                     parameters: v.parameters.clone(),
                     body: v.body.clone(),
                     env: env.clone(),
-                };
+                });
                 Ok(res)
             }
             Expression::Call(v) => eval_call_expression(v, env),
@@ -112,25 +115,23 @@ impl Node for Expression {
 fn eval_call_expression(call: &CallExpression, env: Rc<RefCell<Environment>>) -> Result<Object> {
     let fun = call.function.eval(env.clone())?;
     let args = eval_expressions(&call.arguments, env.clone())?;
-    if let Object::Function {
-        parameters,
-        body,
-        env: fn_env,
-    } = fun
-    {
-        let new_env = Rc::new(RefCell::new(Environment::from(fn_env)));
-        for (idx, arg) in parameters.iter().enumerate() {
-            new_env.borrow_mut().set(&arg.value, args[idx].clone());
-        }
 
-        let value = body.eval(new_env)?;
-        if let Object::ReturnValue(r) = value {
-            return Ok(*r);
-        }
+    match fun {
+        Object::Function(v) => {
+            let new_env = Rc::new(RefCell::new(Environment::from(v.env)));
+            for (idx, arg) in v.parameters.iter().enumerate() {
+                new_env.borrow_mut().set(&arg.value, args[idx].clone());
+            }
 
-        Ok(value)
-    } else {
-        unreachable!();
+            let value = v.body.eval(new_env)?;
+            if let Object::ReturnValue(r) = value {
+                return Ok(*r);
+            }
+
+            Ok(value)
+        }
+        Object::BuiltinFunction(v) => v.call(&args),
+        _ => unreachable!(),
     }
 }
 
@@ -172,6 +173,7 @@ fn eval_eq_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l == r),
         (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l == r),
+        (Object::String(l), Object::String(r)) => Object::Boolean(l == r),
         (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
@@ -432,5 +434,12 @@ mod test {
             "let sub = fn(x, y) { x - y; }; sub(5, 3);",
             Object::Integer(2)
         );
+    }
+
+    #[test]
+    fn builtin() {
+        should_eval!("len(\"\")", Object::Integer(0));
+        should_eval!("len(\"hello\")", Object::Integer(5));
+        should_err!("len(1)", EvalError::UnsupportedArguments);
     }
 }
