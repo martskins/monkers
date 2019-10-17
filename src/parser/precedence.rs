@@ -9,6 +9,7 @@ pub(crate) enum Precedence {
     Product = 5,
     Prefix = 6,
     Call = 7,
+    Index = 8,
 }
 
 impl From<&Token> for Precedence {
@@ -23,6 +24,7 @@ impl From<&Token> for Precedence {
             Token::Slash => Precedence::Product,
             Token::Asterisk => Precedence::Product,
             Token::LParen => Precedence::Call,
+            Token::LBracket => Precedence::Index,
             _ => Precedence::Lowest,
         }
     }

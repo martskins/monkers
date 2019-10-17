@@ -74,24 +74,26 @@ impl Parser {
 
     fn prefix_parse_fn(&mut self, token: Token) -> Result<Expression> {
         match token {
-            Token::Number(_) => self.parse_integer_literal_expression(),
-            Token::String(_) => self.parse_string_literal_expression(),
-            Token::Identifier(_) => self.parse_identifier_expression(),
-            Token::LParen => self.parse_grouped_expression(),
+            Token::Number(_) => Ok(self.parse_integer_literal()?.into()),
+            Token::String(_) => Ok(self.parse_string_literal()?.into()),
+            Token::Identifier(_) => Ok(self.parse_identifier_literal()?.into()),
+            Token::LParen => Ok(self.parse_grouped_expression()?.into()),
+            Token::LBracket => Ok(self.parse_array_literal()?.into()),
             Token::Keyword(k) => match k {
-                Keyword::True | Keyword::False => self.parse_boolean_expression(),
-                Keyword::If => self.parse_if_expression(),
+                Keyword::True | Keyword::False => Ok(self.parse_boolean_literal()?.into()),
+                Keyword::If => Ok(self.parse_if_expression()?.into()),
                 Keyword::Function => self.parse_function_expression(),
                 t => Err(ParseError::NoPrefix(Token::Keyword(t.clone()))),
             },
-            Token::Minus | Token::Bang => self.parse_prefix_expression(),
+            Token::Minus | Token::Bang => Ok(self.parse_prefix_expression()?.into()),
             t => Err(ParseError::NoPrefix(t.clone())),
         }
     }
 
     fn infix_parse_fn(&mut self, token: Token, left: Expression) -> Result<Expression> {
         match token {
-            Token::LParen => self.parse_call_expression(left),
+            Token::LParen => Ok(self.parse_call_expression(left)?.into()),
+            Token::LBracket => Ok(self.parse_index_expression(left)?.into()),
             Token::Plus
             | Token::Minus
             | Token::Slash
@@ -99,9 +101,19 @@ impl Parser {
             | Token::EqEq
             | Token::NotEq
             | Token::LT
-            | Token::GT => self.parse_infix_expression(left),
+            | Token::GT => Ok(self.parse_infix_expression(left)?.into()),
             t => Err(ParseError::NoInfix(t.clone())),
         }
+    }
+
+    fn parse_index_expression(&mut self, left: Expression) -> Result<IndexExpression> {
+        self.next(); // skip opening bracket
+        let index = self.parse_expression(Precedence::Lowest)?;
+        self.next(); // skip closing bracket
+        Ok(IndexExpression {
+            left: Box::new(left),
+            index: Box::new(index),
+        })
     }
 
     fn parse_call_arguments(&mut self) -> Result<Vec<Expression>> {
@@ -130,16 +142,16 @@ impl Parser {
         Ok(arguments)
     }
 
-    fn parse_call_expression(&mut self, function: Expression) -> Result<Expression> {
+    fn parse_call_expression(&mut self, function: Expression) -> Result<CallExpression> {
         let arguments = self.parse_call_arguments()?;
 
-        Ok(Expression::from(CallExpression {
+        Ok(CallExpression {
             function: Box::new(function),
             arguments,
-        }))
+        })
     }
 
-    fn parse_if_expression(&mut self) -> Result<Expression> {
+    fn parse_if_expression(&mut self) -> Result<IfExpression> {
         expect_token!(self.next_token(), &Token::LParen);
         let condition = self.parse_expression(Precedence::Lowest)?;
 
@@ -158,13 +170,11 @@ impl Parser {
             None
         };
 
-        let expr = IfExpression {
+        Ok(IfExpression {
             condition: Box::new(condition),
             consequence,
             alternative,
-        };
-
-        Ok(Expression::If(expr))
+        })
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<Identifier>> {
@@ -227,38 +237,54 @@ impl Parser {
         Ok(BlockStatement { statements })
     }
 
-    fn parse_grouped_expression(&mut self) -> Result<Expression> {
+    fn parse_grouped_expression(&mut self) -> Result<GroupedExpression> {
         self.next(); // skip paren
 
         let expr = self.parse_expression(Precedence::Lowest)?;
         expect_token!(self.next_token(), &Token::RParen);
 
-        Ok(Expression::from(GroupedExpression {
+        Ok(GroupedExpression {
             value: Box::new(expr),
-        }))
+        })
     }
 
-    fn parse_infix_expression(&mut self, left: Expression) -> Result<Expression> {
+    fn parse_infix_expression(&mut self, left: Expression) -> Result<InfixExpression> {
         let precedence = Precedence::from(self.current_token());
         let operator = Operator::from(self.current_token());
         self.next();
         let right = self.parse_expression(precedence)?;
-        let expr = Expression::Infix(InfixExpression {
+
+        Ok(InfixExpression {
             left: Box::new(left),
             operator,
             right: Box::new(right),
-        });
-        Ok(expr)
+        })
     }
 
-    fn parse_prefix_expression(&mut self) -> Result<Expression> {
+    fn parse_prefix_expression(&mut self) -> Result<PrefixExpression> {
         let operator = Operator::from(self.current_token());
 
         self.next();
         let right = self.parse_expression(Precedence::Prefix)?;
         let right = Box::new(right);
 
-        Ok(Expression::Prefix(PrefixExpression { operator, right }))
+        Ok(PrefixExpression { operator, right })
+    }
+
+    fn parse_array_literal(&mut self) -> Result<ArrayLiteral> {
+        let mut elements = vec![];
+        self.next(); // skip opening bracket
+        while &Token::RBracket != self.current_token() && &Token::EOF != self.current_token() {
+            if let Token::Comma = self.current_token() {
+                self.next();
+                continue;
+            }
+            let elem = self.parse_expression(Precedence::Lowest)?;
+            elements.push(elem);
+            self.next();
+        }
+
+        Ok(ArrayLiteral { elements })
     }
 
     fn parse_string_literal(&self) -> Result<StringLiteral> {
@@ -276,14 +302,14 @@ impl Parser {
         Ok(Expression::StringLiteral(self.parse_string_literal()?))
     }
 
-    fn parse_boolean_expression(&self) -> Result<Expression> {
+    fn parse_boolean_literal(&self) -> Result<BooleanLiteral> {
         let result = match self.current_token() {
             Token::Keyword(Keyword::True) => BooleanLiteral { value: true },
             Token::Keyword(Keyword::False) => BooleanLiteral { value: false },
             _ => unreachable!(),
         };
 
-        Ok(Expression::BooleanLiteral(result))
+        Ok(result)
     }
 
     fn parse_identifier_literal(&self) -> Result<Identifier> {
@@ -297,17 +323,12 @@ impl Parser {
         }
     }
 
-    fn parse_identifier_expression(&self) -> Result<Expression> {
-        let ident = self.parse_identifier_literal()?;
-        Ok(Expression::Identifier(ident))
-    }
-
-    fn parse_integer_literal_expression(&self) -> Result<Expression> {
+    fn parse_integer_literal(&self) -> Result<IntegerLiteral> {
         let token = self.current_token();
         if let Token::Number(value) = token {
-            Ok(Expression::from(IntegerLiteral {
+            Ok(IntegerLiteral {
                 value: value.parse()?,
-            }))
+            })
         } else {
             Err(ParseError::UnexpectedToken(token.clone()))
         }
@@ -404,6 +425,19 @@ mod test {
     }
 
     #[test]
+    fn parse_array_literal() {
+        let mut parser = parser_from("[1, 2]");
+        let actual = parser.parse_array_literal().unwrap();
+        let expect = ArrayLiteral {
+            elements: vec![
+                Expression::from(IntegerLiteral { value: 1 }),
+                Expression::from(IntegerLiteral { value: 2 }),
+            ],
+        };
+        assert_eq!(expect, actual);
+    }
+
+    #[test]
     fn parse_string_literal() {
         let parser = parser_from("\"foobar\"");
         let actual = parser.parse_string_literal().unwrap();
@@ -495,35 +529,25 @@ mod test {
     }
 
     #[test]
-    fn parse_identifier_expression() {
-        let parser = parser_from("someVar;");
-        let actual = parser.parse_identifier_expression().unwrap();
-        let expect = Expression::Identifier(Identifier {
-            value: "someVar".into(),
-        });
-        assert_eq!(expect, actual);
-    }
-
-    #[test]
     fn parse_prefix_expression_bang() {
         let mut parser = parser_from("!5;");
-        let actual = parser.parse_prefix_expression().unwrap();
-        let expect = Expression::Prefix(PrefixExpression {
+        let actual = parser.parse_prefix_expression();
+        let expect = PrefixExpression {
             operator: Operator::Bang,
             right: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 5 })),
-        });
-        assert_eq!(expect, actual);
+        };
+        assert_eq!(Ok(expect), actual);
     }
 
     #[test]
     fn parse_prefix_expression_minus() {
         let mut parser = parser_from("-15;");
-        let actual = parser.parse_prefix_expression().unwrap();
-        let expect = Expression::Prefix(PrefixExpression {
+        let actual = parser.parse_prefix_expression();
+        let expect = PrefixExpression {
             operator: Operator::Minus,
             right: Box::new(Expression::IntegerLiteral(IntegerLiteral { value: 15 })),
-        });
-        assert_eq!(expect, actual);
+        };
+        assert_eq!(Ok(expect), actual);
     }
 
     #[test]
@@ -565,8 +589,8 @@ mod test {
     #[test]
     fn parse_if_expression() {
         let mut parser = parser_from("if (x > y) { x } else { y }");
-        let actual = parser.parse_if_expression().unwrap();
-        let expect = Expression::If(IfExpression {
+        let actual = parser.parse_if_expression();
+        let expect = IfExpression {
             condition: Box::new(Expression::Grouped(GroupedExpression {
                 value: Box::new(Expression::Infix(InfixExpression {
                     operator: Operator::Gt,
@@ -584,17 +608,17 @@ mod test {
                     value: Expression::from(Identifier { value: "y".into() }),
                 })],
             }),
-        });
+        };
 
-        assert_eq!(expect, actual);
+        assert_eq!(Ok(expect), actual);
     }
 
     #[test]
     fn parse_integer_literal_expression() {
         let parser = parser_from("5;");
-        let actual = parser.parse_integer_literal_expression().unwrap();
-        let expect = Expression::IntegerLiteral(IntegerLiteral { value: 5 });
-        assert_eq!(expect, actual);
+        let actual = parser.parse_integer_literal();
+        let expect = IntegerLiteral { value: 5 };
+        assert_eq!(Ok(expect), actual);
     }
 
     #[test]
@@ -602,20 +626,20 @@ mod test {
         let test_cases = vec![("true;", true), ("false;", false)];
         for test_case in test_cases {
             let parser = parser_from(test_case.0);
-            let actual = parser.parse_boolean_expression().unwrap();
-            let expect = Expression::BooleanLiteral(BooleanLiteral { value: test_case.1 });
-            assert_eq!(expect, actual);
+            let actual = parser.parse_boolean_literal();
+            let expect = BooleanLiteral { value: test_case.1 };
+            assert_eq!(Ok(expect), actual);
         }
     }
 
     #[test]
     fn test_identifier_expressions() {
         let parser = parser_from("foobar;");
-        let actual = parser.parse_identifier_expression().unwrap();
-        let expect = Expression::from(Identifier {
+        let actual = parser.parse_identifier_literal();
+        let expect = Identifier {
             value: "foobar".into(),
-        });
-        assert_eq!(expect, actual);
+        };
+        assert_eq!(Ok(expect), actual);
     }
 
     #[test]

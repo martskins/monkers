@@ -1,7 +1,7 @@
 use crate::lexer::Token;
 use std::num::ParseIntError;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {
     UnexpectedToken(Token),
     ParseIntError(ParseIntError),

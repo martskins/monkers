@@ -96,6 +96,8 @@ impl Lexer {
             ')' => Token::RParen,
             '{' => Token::LBrace,
             '}' => Token::RBrace,
+            '[' => Token::LBracket,
+            ']' => Token::RBracket,
             ',' => Token::Comma,
             ';' => Token::Semicolon,
             '<' => Token::LT,
@@ -159,6 +161,8 @@ mod test {
 
                         "foobar";
                         "foo bar";
+
+                        [1, 2];
                         "#;
 
         let mut lexer = Lexer::new(input.into());
@@ -247,6 +251,13 @@ mod test {
         assert_eq!(Token::String("foobar".into()), lexer.next_token());
         assert_eq!(Token::Semicolon, lexer.next_token());
         assert_eq!(Token::String("foo bar".into()), lexer.next_token());
+        assert_eq!(Token::Semicolon, lexer.next_token());
+
+        assert_eq!(Token::LBracket, lexer.next_token());
+        assert_eq!(Token::Number("1".into()), lexer.next_token());
+        assert_eq!(Token::Comma, lexer.next_token());
+        assert_eq!(Token::Number("2".into()), lexer.next_token());
+        assert_eq!(Token::RBracket, lexer.next_token());
         assert_eq!(Token::Semicolon, lexer.next_token());
     }
 }

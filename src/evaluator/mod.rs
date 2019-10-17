@@ -66,6 +66,20 @@ impl Node for Expression {
             Expression::IntegerLiteral(v) => Ok(Object::Integer(v.value)),
             Expression::BooleanLiteral(v) => Ok(Object::Boolean(v.value)),
             Expression::StringLiteral(v) => Ok(Object::String(v.value.clone())),
+            Expression::ArrayLiteral(v) => {
+                let elements = eval_expressions(&v.elements, env)?;
+                Ok(Object::Array(elements))
+            }
+            Expression::Index(v) => {
+                let array = v.left.eval(env.clone())?;
+                let index = v.index.eval(env)?;
+                match (array, index) {
+                    (Object::Array(array), Object::Integer(index)) => {
+                        return Ok(array.get(index as usize).unwrap().clone())
+                    }
+                    (a, i) => unreachable!("Got {:?} and {:?}", a, i),
+                }
+            }
             Expression::If(v) => {
                 let condition = v.condition.eval(env.clone())?;
                 if condition.is_truthy() {
@@ -163,6 +177,8 @@ fn eval_neq_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l != r),
         (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l != r),
+        (Object::String(l), Object::String(r)) => Object::Boolean(l != r),
+        (Object::Array(l), Object::Array(r)) => Object::Boolean(l != r),
         (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
@@ -174,6 +190,7 @@ fn eval_eq_infix_expression(left: Object, right: Object) -> Result<Object> {
         (Object::Integer(l), Object::Integer(r)) => Object::Boolean(l == r),
         (Object::Boolean(l), Object::Boolean(r)) => Object::Boolean(l == r),
         (Object::String(l), Object::String(r)) => Object::Boolean(l == r),
+        (Object::Array(l), Object::Array(r)) => Object::Boolean(l == r),
         (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
@@ -229,6 +246,13 @@ fn eval_add_infix_expression(left: Object, right: Object) -> Result<Object> {
     let res = match (left, right) {
         (Object::Integer(l), Object::Integer(r)) => Object::Integer(l + r),
         (Object::String(l), Object::String(r)) => Object::String(format!("{}{}", l, r)),
+        (Object::Array(l), Object::Array(r)) => {
+            let mut n = l.clone();
+            for elem in r {
+                n.push(elem);
+            }
+            Object::Array(n)
+        }
         (l, r) => return Err(EvalError::TypeMismatch(l, r)),
     };
 
@@ -257,6 +281,7 @@ fn eval_bang_operator(right: Object) -> Result<Object> {
         Object::Integer(0) => Object::Boolean(true),
         Object::Boolean(v) => Object::Boolean(!v),
         Object::String(s) => Object::Boolean(s.is_empty()),
+        Object::Array(s) => Object::Boolean(s.is_empty()),
         Object::Null => Object::Boolean(true),
         _ => Object::Boolean(false),
     };
@@ -441,5 +466,15 @@ mod test {
         should_eval!("len(\"\")", Object::Integer(0));
         should_eval!("len(\"hello\")", Object::Integer(5));
         should_err!("len(1)", EvalError::UnsupportedArguments);
+    }
+
+    #[test]
+    fn arrays() {
+        should_eval!("[1, 2][0]", Object::Integer(1));
+        should_eval!("[1, 2][1]", Object::Integer(2));
+        should_eval!(
+            "let stuff = fn(x) { return [x, x + 1]; }; stuff(10)[1];",
+            Object::Integer(11)
+        );
     }
 }

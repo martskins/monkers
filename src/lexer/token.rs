@@ -20,6 +20,8 @@ pub enum Token {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
     Identifier(String),
     Number(String),
     String(String),

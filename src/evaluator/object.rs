@@ -66,6 +66,7 @@ pub enum Object {
     String(String),
     Function(Function),
     ReturnValue(Box<Object>),
+    Array(Vec<Object>),
 }
 
 impl Object {
@@ -75,6 +76,7 @@ impl Object {
             Object::Integer(0) => false,
             Object::String(s) => !s.is_empty(),
             Object::Boolean(false) => false,
+            Object::Array(v) => !v.is_empty(),
             _ => true,
         }
     }
@@ -87,6 +89,14 @@ impl Display for Object {
             Object::BuiltinFunction(v) => write!(f, "{}", v),
             Object::Integer(v) => write!(f, "{}", v),
             Object::Boolean(v) => write!(f, "{}", v),
+            Object::Array(v) => write!(
+                f,
+                "{}",
+                v.iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ),
             Object::String(v) => write!(f, "{}", v),
             Object::ReturnValue(v) => write!(f, "{}", v),
             Object::Function(v) => write!(f, "{}", v),

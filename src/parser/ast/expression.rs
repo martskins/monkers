@@ -8,6 +8,8 @@ pub enum Expression {
     IntegerLiteral(IntegerLiteral),
     BooleanLiteral(BooleanLiteral),
     StringLiteral(StringLiteral),
+    ArrayLiteral(ArrayLiteral),
+    Index(IndexExpression),
     If(IfExpression),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
@@ -23,6 +25,8 @@ impl Display for Expression {
             Expression::IntegerLiteral(v) => write!(f, "{}", v),
             Expression::BooleanLiteral(v) => write!(f, "{}", v),
             Expression::StringLiteral(v) => write!(f, "{}", v),
+            Expression::ArrayLiteral(v) => write!(f, "{}", v),
+            Expression::Index(v) => write!(f, "{}", v),
             Expression::If(v) => write!(f, "{}", v),
             Expression::Prefix(v) => write!(f, "{}", v),
             Expression::Infix(v) => write!(f, "{}", v),
@@ -30,6 +34,31 @@ impl Display for Expression {
             Expression::Call(v) => write!(f, "{}", v),
             Expression::Grouped(v) => write!(f, "{}", v),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ArrayLiteral {
+    pub(crate) elements: Vec<Expression>,
+}
+
+impl Display for ArrayLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.elements
+                .iter()
+                .map(|x| format!("{}", x))
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    }
+}
+
+impl From<ArrayLiteral> for Expression {
+    fn from(f: ArrayLiteral) -> Self {
+        Expression::ArrayLiteral(f)
     }
 }
 
@@ -215,6 +244,24 @@ impl Display for FunctionLiteral {
 impl From<FunctionLiteral> for Expression {
     fn from(f: FunctionLiteral) -> Self {
         Expression::Function(f)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IndexExpression {
+    pub(crate) left: Box<Expression>,
+    pub(crate) index: Box<Expression>,
+}
+
+impl Display for IndexExpression {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}[{}]", self.left, self.index)
+    }
+}
+
+impl From<IndexExpression> for Expression {
+    fn from(f: IndexExpression) -> Self {
+        Expression::Index(f)
     }
 }
 
