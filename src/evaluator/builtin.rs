@@ -10,11 +10,18 @@ pub enum BuiltinFunction {
     Tail,
     Head,
     Push,
+    Puts,
 }
 
 impl BuiltinFunction {
     pub fn call(&self, args: &[Object]) -> Result<Object> {
         match self {
+            BuiltinFunction::Puts => {
+                args.iter().for_each(|x| {
+                    println!("{}", x);
+                });
+                Ok(Object::Null)
+            }
             BuiltinFunction::Push => {
                 if args.len() == 2 {
                     match args.first().unwrap() {
@@ -95,6 +102,7 @@ impl BuiltinFunction {
 impl Display for BuiltinFunction {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
+            BuiltinFunction::Puts => write!(f, "puts"),
             BuiltinFunction::Push => write!(f, "push"),
             BuiltinFunction::Len => write!(f, "len"),
             BuiltinFunction::First => write!(f, "first"),

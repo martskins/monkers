@@ -136,6 +136,7 @@ impl Node for Expression {
                 eval_prefix_expression(&v.operator, right)
             }
             Expression::Identifier(v) => match v.value.as_str() {
+                "puts" => Ok(Object::BuiltinFunction(BuiltinFunction::Puts)),
                 "push" => Ok(Object::BuiltinFunction(BuiltinFunction::Push)),
                 "len" => Ok(Object::BuiltinFunction(BuiltinFunction::Len)),
                 "first" => Ok(Object::BuiltinFunction(BuiltinFunction::First)),
