@@ -7,6 +7,7 @@ pub use result::*;
 use crate::lexer::{Keyword, Lexer, Token};
 use precedence::Precedence;
 use result::{ParseError, Result};
+use std::collections::HashMap;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -79,6 +80,7 @@ impl Parser {
             Token::Identifier(_) => Ok(self.parse_identifier_literal()?.into()),
             Token::LParen => Ok(self.parse_grouped_expression()?.into()),
             Token::LBracket => Ok(self.parse_array_literal()?.into()),
+            Token::LBrace => Ok(self.parse_hash_literal()?.into()),
             Token::Keyword(k) => match k {
                 Keyword::True | Keyword::False => Ok(self.parse_boolean_literal()?.into()),
                 Keyword::If => Ok(self.parse_if_expression()?.into()),
@@ -140,6 +142,29 @@ impl Parser {
 
         self.next(); // skip RParen
         Ok(arguments)
+    }
+
+    fn parse_hash_literal(&mut self) -> Result<HashLiteral> {
+        self.next(); // skip opening brace
+
+        let mut elements = std::collections::BTreeMap::new();
+        while &Token::RBrace != self.current_token() && &Token::EOF != self.current_token() {
+            if &Token::Comma == self.current_token() {
+                self.next();
+                continue;
+            }
+
+            let key = self.parse_expression(Precedence::Lowest)?;
+            expect_token!(self.next_token(), &Token::Colon);
+            self.next(); // skip colon
+            let val = self.parse_expression(Precedence::Lowest)?;
+
+            elements.insert(Expression::from(key), val);
+
+            self.next();
+        }
+
+        Ok(HashLiteral { elements })
     }
 
     fn parse_call_expression(&mut self, function: Expression) -> Result<CallExpression> {
@@ -403,6 +428,7 @@ impl Parser {
 mod test {
     use crate::lexer::*;
     use crate::parser::*;
+    use std::collections::BTreeMap;
 
     fn parser_from(input: &str) -> Parser {
         let mut lexer = Lexer::new(input.into());
@@ -422,6 +448,26 @@ mod test {
             assert_ne!(0, program.statements.len());
             assert_eq!($expect, program.statements[0]);
         };
+    }
+
+    #[test]
+    fn parse_hash_literal() {
+        let mut parser = parser_from("{\"foo\": \"bar\"};");
+        let actual = parser.parse_hash_literal();
+        let mut elements = BTreeMap::new();
+        elements.insert(
+            StringLiteral {
+                value: "foo".into(),
+            }
+            .into(),
+            StringLiteral {
+                value: "bar".into(),
+            }
+            .into(),
+        );
+
+        let expected = HashLiteral { elements };
+        assert_eq!(Ok(expected), actual);
     }
 
     #[test]

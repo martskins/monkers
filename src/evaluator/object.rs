@@ -1,114 +1,14 @@
+use super::builtin::BuiltinFunction;
 use super::result::{EvalError, Result};
 use super::Environment;
 use crate::parser::{BlockStatement, Identifier};
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
+use std::hash::Hash;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum BuiltinFunction {
-    Len,
-    First,
-    Last,
-    Tail,
-    Head,
-    Push,
-}
-
-impl BuiltinFunction {
-    pub fn call(&self, args: &[Object]) -> Result<Object> {
-        match self {
-            BuiltinFunction::Push => {
-                if args.len() == 2 {
-                    match args.first().unwrap() {
-                        Object::Array(s) => {
-                            let mut out = s.clone();
-                            out.push(args[1].clone());
-                            Ok(Object::Array(out))
-                        }
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-            BuiltinFunction::First => {
-                if args.len() == 1 {
-                    match args.first().unwrap() {
-                        Object::Array(s) => Ok(s.first().cloned().unwrap_or(Object::Null)),
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-            BuiltinFunction::Last => {
-                if args.len() == 1 {
-                    match args.first().unwrap() {
-                        Object::Array(s) => Ok(s.last().cloned().unwrap_or(Object::Null)),
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-            BuiltinFunction::Head => {
-                if args.len() == 1 {
-                    match args.first().unwrap() {
-                        Object::Array(s) => Ok(Object::Array(if s.len() == 0 {
-                            vec![]
-                        } else {
-                            s.split_at(s.len() - 1).0.to_vec()
-                        })),
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-            BuiltinFunction::Tail => {
-                if args.len() == 1 {
-                    match args.first().unwrap() {
-                        Object::Array(s) => Ok(Object::Array(if s.len() == 0 {
-                            vec![]
-                        } else {
-                            s.split_at(1).1.to_vec()
-                        })),
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-            BuiltinFunction::Len => {
-                if args.len() == 1 {
-                    match args.first().unwrap() {
-                        Object::String(s) => Ok(Object::Integer(s.len() as i64)),
-                        Object::Array(s) => Ok(Object::Integer(s.len() as i64)),
-                        _ => Err(EvalError::UnsupportedArguments),
-                    }
-                } else {
-                    Err(EvalError::UnsupportedArguments)
-                }
-            }
-        }
-    }
-}
-
-impl Display for BuiltinFunction {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            BuiltinFunction::Push => write!(f, "push"),
-            BuiltinFunction::Len => write!(f, "len"),
-            BuiltinFunction::First => write!(f, "first"),
-            BuiltinFunction::Last => write!(f, "last"),
-            BuiltinFunction::Head => write!(f, "head"),
-            BuiltinFunction::Tail => write!(f, "tail"),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
@@ -130,12 +30,30 @@ impl Display for Function {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
+pub enum Hashable {
+    Integer(i64),
+    Boolean(bool),
+    String(String),
+}
+
+impl Display for Hashable {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            Hashable::String(v) => write!(f, "{}", v),
+            Hashable::Integer(v) => write!(f, "{}", v),
+            Hashable::Boolean(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Object {
     Null,
     BuiltinFunction(BuiltinFunction),
     Integer(i64),
     Boolean(bool),
+    Hash(BTreeMap<Hashable, Object>),
     String(String),
     Function(Function),
     ReturnValue(Box<Object>),
@@ -150,6 +68,7 @@ impl Object {
             Object::String(s) => !s.is_empty(),
             Object::Boolean(false) => false,
             Object::Array(v) => !v.is_empty(),
+            Object::Hash(v) => !v.is_empty(),
             _ => true,
         }
     }
@@ -162,6 +81,14 @@ impl Display for Object {
             Object::BuiltinFunction(v) => write!(f, "{}", v),
             Object::Integer(v) => write!(f, "{}", v),
             Object::Boolean(v) => write!(f, "{}", v),
+            Object::Hash(v) => write!(
+                f,
+                "[{}]",
+                v.iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ),
             Object::Array(v) => write!(
                 f,
                 "{}",

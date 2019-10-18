@@ -1,12 +1,12 @@
 use super::Object;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{self, Formatter};
 use std::rc::Rc;
 
-#[derive(PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct Environment {
-    data: HashMap<String, Object>,
+    data: BTreeMap<String, Object>,
     parent: Option<Rc<RefCell<Environment>>>,
 }
 
@@ -19,14 +19,14 @@ impl std::fmt::Debug for Environment {
 impl Environment {
     pub fn new() -> Self {
         Environment {
-            data: HashMap::new(),
+            data: BTreeMap::new(),
             parent: None,
         }
     }
 
     pub fn from(parent: Rc<RefCell<Environment>>) -> Environment {
         Environment {
-            data: HashMap::new(),
+            data: BTreeMap::new(),
             parent: Some(parent),
         }
     }

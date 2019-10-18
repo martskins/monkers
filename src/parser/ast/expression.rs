@@ -1,14 +1,16 @@
 use super::operator::Operator;
 use super::statement::BlockStatement;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub enum Expression {
     Identifier(Identifier),
     IntegerLiteral(IntegerLiteral),
     BooleanLiteral(BooleanLiteral),
     StringLiteral(StringLiteral),
     ArrayLiteral(ArrayLiteral),
+    HashLiteral(HashLiteral),
     Index(IndexExpression),
     If(IfExpression),
     Prefix(PrefixExpression),
@@ -26,6 +28,7 @@ impl Display for Expression {
             Expression::BooleanLiteral(v) => write!(f, "{}", v),
             Expression::StringLiteral(v) => write!(f, "{}", v),
             Expression::ArrayLiteral(v) => write!(f, "{}", v),
+            Expression::HashLiteral(v) => write!(f, "{}", v),
             Expression::Index(v) => write!(f, "{}", v),
             Expression::If(v) => write!(f, "{}", v),
             Expression::Prefix(v) => write!(f, "{}", v),
@@ -37,7 +40,32 @@ impl Display for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
+pub struct HashLiteral {
+    pub(crate) elements: BTreeMap<Expression, Expression>,
+}
+
+impl Display for HashLiteral {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}]",
+            self.elements
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, v))
+                .collect::<Vec<String>>()
+                .join(",")
+        )
+    }
+}
+
+impl From<HashLiteral> for Expression {
+    fn from(f: HashLiteral) -> Self {
+        Expression::HashLiteral(f)
+    }
+}
+
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct ArrayLiteral {
     pub(crate) elements: Vec<Expression>,
 }
@@ -62,7 +90,7 @@ impl From<ArrayLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct StringLiteral {
     pub(crate) value: String,
 }
@@ -79,7 +107,7 @@ impl From<StringLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct Identifier {
     pub(crate) value: String,
 }
@@ -96,7 +124,7 @@ impl From<Identifier> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct IntegerLiteral {
     pub(crate) value: i64,
 }
@@ -113,7 +141,7 @@ impl From<IntegerLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub(crate) operator: Operator,
     pub(crate) right: Box<Expression>,
@@ -140,7 +168,7 @@ impl From<PrefixExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct InfixExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) operator: Operator,
@@ -169,7 +197,7 @@ impl From<InfixExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct BooleanLiteral {
     pub(crate) value: bool,
 }
@@ -186,7 +214,7 @@ impl From<BooleanLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct IfExpression {
     pub(crate) condition: Box<Expression>,
     pub(crate) consequence: BlockStatement,
@@ -220,7 +248,7 @@ impl From<IfExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub(crate) parameters: Vec<Identifier>,
     pub(crate) body: BlockStatement,
@@ -247,7 +275,7 @@ impl From<FunctionLiteral> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct IndexExpression {
     pub(crate) left: Box<Expression>,
     pub(crate) index: Box<Expression>,
@@ -265,7 +293,7 @@ impl From<IndexExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct CallExpression {
     pub(crate) function: Box<Expression>,
     pub(crate) arguments: Vec<Expression>,
@@ -292,7 +320,7 @@ impl From<CallExpression> for Expression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct GroupedExpression {
     pub(crate) value: Box<Expression>,
 }
