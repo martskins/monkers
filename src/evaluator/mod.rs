@@ -103,7 +103,12 @@ impl Node for Expression {
                 eval_prefix_expression(&v.operator, right)
             }
             Expression::Identifier(v) => match v.value.as_str() {
+                "push" => Ok(Object::BuiltinFunction(BuiltinFunction::Push)),
                 "len" => Ok(Object::BuiltinFunction(BuiltinFunction::Len)),
+                "first" => Ok(Object::BuiltinFunction(BuiltinFunction::First)),
+                "last" => Ok(Object::BuiltinFunction(BuiltinFunction::Last)),
+                "head" => Ok(Object::BuiltinFunction(BuiltinFunction::Head)),
+                "tail" => Ok(Object::BuiltinFunction(BuiltinFunction::Tail)),
                 _ => {
                     let val = env.borrow().get(&v.value);
                     if val.is_none() {
@@ -301,7 +306,7 @@ mod test {
             let mut parser = Parser::from($input);
             let program = parser.parse().unwrap();
             let actual = program.eval(env);
-            assert_eq!(Err($expect), actual);
+            assert_eq!(actual, Err($expect));
         };
     }
 
@@ -311,7 +316,7 @@ mod test {
             let mut parser = Parser::from($input);
             let program = parser.parse().unwrap();
             let actual = program.eval(env).unwrap();
-            assert_eq!($expect, actual);
+            assert_eq!(actual, $expect);
         };
     }
 
@@ -462,15 +467,58 @@ mod test {
     }
 
     #[test]
-    fn builtin() {
+    fn builtin_len() {
         should_eval!("len(\"\")", Object::Integer(0));
         should_eval!("len(\"hello\")", Object::Integer(5));
+        should_eval!("len([])", Object::Integer(0));
+        should_eval!("len([1, 2])", Object::Integer(2));
+
         should_err!("len(1)", EvalError::UnsupportedArguments);
+    }
+
+    #[test]
+    fn builtin_first() {
+        should_eval!("first([])", Object::Null);
+        should_eval!("first([1, 2])", Object::Integer(1));
+
+        should_err!("len(1)", EvalError::UnsupportedArguments);
+    }
+
+    #[test]
+    fn builtin_last() {
+        should_eval!("last([])", Object::Null);
+        should_eval!("last([1, 2])", Object::Integer(2));
+    }
+
+    #[test]
+    fn builtin_tail() {
+        should_eval!("tail([])", Object::Array(vec![]));
+        should_eval!("tail([1, 2])", Object::Array(vec![Object::Integer(2)]));
+    }
+
+    #[test]
+    fn builtin_head() {
+        should_eval!("head([])", Object::Array(vec![]));
+        should_eval!("head([1, 2])", Object::Array(vec![Object::Integer(1)]));
+    }
+
+    #[test]
+    fn builtin_push() {
+        should_eval!("push([], 1)", Object::Array(vec![Object::Integer(1)]));
+        should_eval!(
+            "push([1, 2], 1)",
+            Object::Array(vec![
+                Object::Integer(1),
+                Object::Integer(2),
+                Object::Integer(1)
+            ])
+        );
     }
 
     #[test]
     fn arrays() {
         should_eval!("[1, 2][0]", Object::Integer(1));
+        should_eval!("[1, 2 + 2][1]", Object::Integer(4));
         should_eval!("[1, 2][1]", Object::Integer(2));
         should_eval!(
             "let stuff = fn(x) { return [x, x + 1]; }; stuff(10)[1];",
