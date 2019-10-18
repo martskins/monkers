@@ -50,7 +50,7 @@ impl Lexer {
     fn lex_identifier(&mut self) -> Token {
         let mut value = String::new();
         let mut c = self.read();
-        while c.is_alphabetic() {
+        while c.is_alphabetic() || c == &'_' {
             value.push(c.clone());
             c = self.read();
         }
