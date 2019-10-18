@@ -74,9 +74,6 @@ let meaning_of_life = some_hash[true];
     let unchanged = !!true;
     ```
 
-  - `--, ++`: Decrement and increment operators. Can be applied to `integer`s only.
-
-
 ## The REPL
 
 The project includes a REPL, which you can use to evaluate `monkey` code. You can launch said REPL by running `cargo run`.
