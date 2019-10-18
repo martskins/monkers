@@ -44,6 +44,7 @@ let meaning_of_life = some_hash[true];
   - `head(X)`: Returns a slice of an array X containing all but the last element, or an empty array if X had no elements.
   - `tail(X)`: Returns a slice of an array X containing all but the first element, or an empty array if X had no elements.
   - `push(X)`: Adds an element in the last position of an array X.
+  - `push(...X)`: Prints the value of any amount of arguments, each on a different line.
 
 
   ### Infix Operators
